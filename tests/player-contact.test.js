@@ -33,6 +33,24 @@ test('path steering routes two opponents to opposite sides before repeated head-
   assert.ok((ta.y-350)*(tb.y-350)<0,'opponents should choose complementary escape sides');
 });
 
+test('loser of a clear physical duel keeps a short deterministic escape route instead of re-entering the same line',()=>{
+  const strong=p('strong',0,300,95,2.6,0),weak=p('weak',1,318,40,-1.4,0),ball={x:260,y:350};
+  resolvePlayerContacts([strong,weak]);
+  assert.ok(weak.contactEscapeTicks>=6,'clear loser should retain a short disengagement memory');
+  assert.ok(Math.hypot(weak.contactEscapeX,weak.contactEscapeY)>.9);
+  assert.equal(Number(strong.contactEscapeTicks)||0,0,'winner should keep the line instead of being forced away');
+  const target=steerAroundOpponent(weak,{x:260,y:350},[strong,weak],ball);
+  assert.notEqual(target.y,350,'loser must step out of the collision lane before challenging again');
+  assert.ok(weak.contactEscapeTicks>=5,'escape should persist for several steering frames');
+});
+
+test('team-mate contact never creates competitive duel escape memory',()=>{
+  const a=p('a',0,300,95,2.6,0),b=p('b',0,318,40,-1.4,0);
+  resolvePlayerContacts([a,b]);
+  assert.equal(Number(a.contactEscapeTicks)||0,0);
+  assert.equal(Number(b.contactEscapeTicks)||0,0);
+});
+
 test('a player between opponent and ball gains physical shielding leverage',()=>{
   const holder=p('holder',0,300,86),challenger=p('challenger',1,318,70),ball={x:284,y:350,vx:1.2,vy:0};
   const leverage=shieldingLeverage(holder,challenger,ball);
