@@ -83,3 +83,20 @@ test('shielding posture makes the body-line winner give less ground without movi
   assert.ok(Math.abs(holder.x-hx)<Math.abs(challenger.x-cx),'shielding player should resist displacement and force the challenger to give more ground');
   assert.deepEqual(ball,beforeBall,'player contact posture must never alter free-ball position or velocity');
 });
+
+test('shielding winner turns through a lateral exit instead of driving straight back into the duel line',()=>{
+  const holder=p('holder',0,300,88),challenger=p('challenger',1,318,70),ball={x:284,y:350,vx:.7,vy:.15};
+  const beforeBall={...ball};
+  const target=steerAroundOpponent(holder,{x:260,y:350},[holder,challenger],ball);
+  assert.ok(holder.contactLeverage>.1,'holder must first have real body-line leverage');
+  assert.notEqual(target.y,350,'shielding advantage should create a lateral turning lane');
+  assert.ok(target.x<holder.x,'turn must still contain a small movement toward the free ball');
+  assert.deepEqual(ball,beforeBall,'shielding turn logic must not steer, slow or move the ball');
+});
+
+test('shielding exit side is deterministic for the same pair and geometry',()=>{
+  const make=()=>{const holder=p('holder',0,300,88),challenger=p('challenger',1,318,70),ball={x:284,y:350,vx:0,vy:0};return{holder,challenger,ball,target:steerAroundOpponent(holder,{x:260,y:350},[holder,challenger],ball)};};
+  const a=make(),b=make();
+  assert.deepEqual(a.target,b.target);
+  assert.equal(Math.sign(a.target.y-350),Math.sign(b.target.y-350));
+});
