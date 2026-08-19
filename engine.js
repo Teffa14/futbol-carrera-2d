@@ -332,9 +332,9 @@ export class MatchEngine{
   }
 
   resolvePlayerBoundary(p){
-    const minY=FIELD.top+p.r,maxY=FIELD.bottom-p.r;if(p.y<minY){p.y=minY;if(p.vy<0)p.vy=0;}else if(p.y>maxY){p.y=maxY;if(p.vy>0)p.vy=0;}
+    const minY=FIELD.top+p.r,maxY=FIELD.bottom-p.r;if(p.y<=minY){p.y=minY;if(p.vy<0)p.vy=0;}else if(p.y>=maxY){p.y=maxY;if(p.vy>0)p.vy=0;}
     const mouth=p.role==='GK'&&p.y>FIELD.goalTop+p.r&&p.y<FIELD.goalBottom-p.r,minX=mouth?FIELD.left-FIELD.goalDepth/2+p.r:FIELD.left+p.r,maxX=mouth?FIELD.right+FIELD.goalDepth/2-p.r:FIELD.right-p.r;
-    if(p.x<minX){p.x=minX;if(p.vx<0)p.vx=0;}else if(p.x>maxX){p.x=maxX;if(p.vx>0)p.vx=0;}
+    if(p.x<=minX){p.x=minX;if(p.vx<0)p.vx=0;}else if(p.x>=maxX){p.x=maxX;if(p.vx>0)p.vx=0;}
   }
   resolvePlayerCollisions(){const contacts=resolvePlayerContacts(this.players),duels=collectDuelEvents(contacts,this.duelLedger,this.tick);for(const duel of duels)this.registerDuelEvent(duel);for(const p of this.players)this.resolvePlayerBoundary(p);return contacts;}
   registerDuelEvent(duel){const winner=this.playerById(duel.winnerId),loser=this.playerById(duel.loserId);if(!winner||!loser)return;winner.perf.bodyDuels++;loser.perf.bodyDuels++;winner.perf.bodyDuelsWon++;this.stats.bodyDuels[winner.team]++;this.stats.bodyDuels[loser.team]++;this.stats.bodyDuelsWon[winner.team]++;const ratingGain=.014+duel.intensity*.022,ratingLoss=.004+duel.intensity*.007;this.adjustRating(winner,ratingGain);this.adjustRating(loser,-ratingLoss);if(duel.kind==='shielding'){winner.perf.shieldingDuels++;loser.perf.shieldingDuels++;winner.perf.shieldingWins++;this.stats.shieldingWins[winner.team]++;this.flash(winner,'cuerpo');}if(winner.id===this.userId)this.pushEvent(duel.kind==='shielding'?'Tu jugador protege la línea con el cuerpo':'Tu jugador gana el duelo físico',winner.team,'user');else if(loser.id===this.userId)this.pushEvent(duel.kind==='shielding'?'Tu jugador pierde la línea en el forcejeo':'Tu jugador pierde el duelo físico',winner.team,'user');}
