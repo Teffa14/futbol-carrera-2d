@@ -1,36 +1,29 @@
 # Sources and attribution
 
-## Player and football data
+## Player data
 
 ### Yusufhan30/FC26-premier-league-dataset
 - Repository: https://github.com/Yusufhan30/FC26-premier-league-dataset
 - License: CC0 1.0 Universal.
-- Used for: bundled Premier League player names, club association and gameplay attributes (overall, position, speed/pace, shooting, passing, dribbling, defense, physical and age).
+- Use: bundled Premier League seed names, clubs and six gameplay attributes.
 
 ### openfootball/players
 - Repository: https://github.com/openfootball/players
 - License: CC0 1.0 Universal / public domain.
-- Used for: public-domain player-name and positional pools used to populate additional career squads and draft prospects.
-- Important: when the game generates ratings around those names, the generated values are original career gameplay values and are not presented as source ratings.
+- Use: public player-name and positional pools used to complete 11v11 squads and generated career players.
+- Generated ratings, extended attributes and potentials are original Career Eleven gameplay values.
 
 ### dcaribou/transfermarkt-datasets
 - Repository: https://github.com/dcaribou/transfermarkt-datasets
 - License: CC0 1.0 Universal.
-- Used for: reference on football player/competition dataset structure and market-value modelling concepts. The current browser build does not bundle the DVC-hosted raw dataset.
+- Use: structural research for club / competition data. The DVC-hosted raw player payload is not bundled.
 
-### footballcsv/cache.footballsquads
-- Repository: https://github.com/footballcsv/cache.footballsquads
-- License: CC0 1.0 Universal.
-- Used for: reference on public squad naming, positions and club-squad structures.
+## Match engine
 
-## Match-engine reference
+`engine.js` is original project code. The current engine models 22 players, controlled possession, dribbling, passing, shooting, physical contests, interceptions, goalkeeper saves, stamina, live player performance and a camera that follows the created player.
 
-The 2D engine is original project code. Public HaxBall stadium/editor documentation and commonly documented stadium parameters were used only to calibrate broad disc-physics concepts such as player radius, ball radius, damping, acceleration, bounce and kick impulse.
+HaxBall is not used as the product name or represented as the engine implementation. Publicly documented disc-physics concepts were only an early calibration reference for ideas such as damping, radius, collision and kick impulse.
 
-No HaxBall source code, proprietary assets, stadium files or trademarks are bundled as game assets.
+## Builds and skills
 
-## Narrative-career reference
-
-Public descriptions of Copero and El Ídolo were used as product-design research for short-session career pacing: identity creation, decision-driven progression, randomness, season/career summaries and replayability.
-
-No source code, protected prose, scenarios, UI artwork or assets from Copero or El Ídolo are copied. All manager scenarios and effects in this repository are original.
+Career builds and skills are original gameplay abstractions. They use common football-game concepts such as archetypes, perks and player development. No proprietary EA Sports / FIFA / EA FC code, data, artwork or trademarked UI is copied.

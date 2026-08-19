@@ -1,59 +1,53 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createCareer, makeRoundRobin, nextUserFixture, completeUserLeagueMatch, draftPlayer, runTraining, sortedTable, marketPlayers } from '../career.js';
-import { countryById } from '../career.js';
+import fs from 'node:fs';
+import {COUNTRIES} from '../data.js';
+import {createCareer,makeRoundRobin,nextFixture,lineup11,trainAttribute,unlockSkill,asyncLineup,recordAsyncResult} from '../career.js';
+import {MatchEngine} from '../engine.js';
 
-test('round robin schedules every club once per round and home/away twice per pair',()=>{
-  const rounds=makeRoundRobin('AR',1);
-  const clubs=countryById('AR').clubs.map(c=>c.id);
-  assert.equal(rounds.length,(clubs.length-1)*2);
-  const pairCount=new Map();
-  for(const round of rounds){
-    const seen=new Set();
-    for(const f of round.fixtures){
-      assert.equal(seen.has(f.home),false);assert.equal(seen.has(f.away),false);seen.add(f.home);seen.add(f.away);
-      const pair=[f.home,f.away].sort().join('|');pairCount.set(pair,(pairCount.get(pair)||0)+1);
-    }
+test('all leagues create 11-player lineups and valid double round robin',()=>{
+  for(const country of COUNTRIES){
+    const club=country.clubs[0];
+    const s=createCareer({playerName:'Test Player',nationality:country.id,position:'CM',build:'creator',countryId:country.id,clubId:club.id});
+    assert.equal(Object.keys(s.world).length,country.clubs.length);
+    for(const c of country.clubs)assert.equal(lineup11(s,c.id).length,11,`${country.id}/${c.id}`);
+    const rounds=makeRoundRobin(country.id,1);
+    assert.equal(rounds.length,(country.clubs.length-1)*2);
+    for(const round of rounds){const seen=new Set();for(const f of round.fixtures){assert.equal(seen.has(f.home),false);assert.equal(seen.has(f.away),false);seen.add(f.home);seen.add(f.away);}}
   }
-  for(const count of pairCount.values())assert.equal(count,2);
 });
 
-test('career creates persistent world squads and valid five-player XI',()=>{
-  const s=createCareer({manager:'Test',nationality:'AR',style:'tactician',countryId:'AR',clubId:'river'});
-  assert.equal(Object.keys(s.clubs).length,6);
-  assert.ok(s.squad.length>=14);
-  assert.equal(s.startingXI.length,5);
-  assert.equal(s.table.length,6);
-  assert.ok(nextUserFixture(s));
+test('created career has no personal default name and user is in starting eleven',()=>{
+  const s=createCareer({playerName:'',nationality:'AR',position:'CAM',build:'technician',countryId:'AR',clubId:'river'});
+  assert.equal(s.player.name,'Jugador');
+  assert.equal(lineup11(s,'river').some(p=>p.isUser),true);
+  const app=fs.readFileSync(new URL('../app.js',import.meta.url),'utf8');
+  assert.equal(app.includes('placeholder="Stefano"'),false);
 });
 
-test('completing user match advances whole round exactly once',()=>{
-  const s=createCareer({manager:'Test',nationality:'EN',style:'developer',countryId:'EN',clubId:'arsenal'});
-  const f=nextUserFixture(s);
-  const round=s.schedule.find(r=>r.week===f.week);
-  completeUserLeagueMatch(s,f.id,[2,1],{scorers:['Bukayo Saka','Bukayo Saka']});
-  assert.equal(round.fixtures.every(x=>x.played),true);
-  assert.equal(s.week,2);
-  assert.equal(s.table.reduce((sum,r)=>sum+r.p,0),round.fixtures.length*2);
-  assert.equal(sortedTable(s).length,6);
+test('training changes an attribute that is used by the player model',()=>{
+  const s=createCareer({playerName:'Test',nationality:'ES',position:'RW',build:'speedster',countryId:'ES',clubId:'barcelona'});
+  const before=s.player.dribbling,points=s.progress.trainingPoints;
+  const r=trainAttribute(s,'dribbling');
+  assert.equal(r.ok,true);assert.ok(s.player.dribbling>before);assert.equal(s.progress.trainingPoints,points-1);
 });
 
-test('draft consumes a pick and adds the prospect to the squad',()=>{
-  const s=createCareer({manager:'Test',nationality:'PT',style:'recruiter',countryId:'PT',clubId:'porto'});
-  const before=s.squad.length,prospect=s.draft.pool[0],picks=s.draft.picksLeft;
-  const res=draftPlayer(s,prospect.instanceId);
-  assert.equal(res.ok,true);assert.equal(s.squad.length,before+1);assert.equal(s.draft.picksLeft,picks-1);
+test('skill system unlocks and equips a perk',()=>{
+  const s=createCareer({playerName:'Test',nationality:'EN',position:'ST',build:'finisher',countryId:'EN',clubId:'arsenal'});
+  const r=unlockSkill(s,'power-shot');
+  assert.equal(r.ok,true);assert.equal(s.player.unlockedSkills.includes('power-shot'),true);
 });
 
-test('training can run once per week',()=>{
-  const s=createCareer({manager:'Test',nationality:'ES',style:'developer',countryId:'ES',clubId:'barcelona'});
-  const a=runTraining(s),b=runTraining(s);
-  assert.equal(a.ok,true);assert.equal(b.ok,false);
+test('async opponent contributes a ghost player to an 11v11 lineup',()=>{
+  const s=createCareer({playerName:'Test',nationality:'PT',position:'CM',build:'engine',countryId:'PT',clubId:'porto'});
+  const opp=s.asyncLeague.opponents[0],xi=asyncLineup(s,opp.id);
+  assert.equal(xi.length,11);assert.equal(xi.some(p=>p.instanceId===opp.player.instanceId),true);
+  const result=recordAsyncResult(s,opp.id,[2,1],{rating:8});
+  assert.equal(result.ok,true);assert.ok(s.asyncLeague.rating>1000);
 });
 
-test('market exposes players from other clubs but not user club',()=>{
-  const s=createCareer({manager:'Test',nationality:'IT',style:'recruiter',countryId:'IT',clubId:'inter'});
-  const market=marketPlayers(s);
-  assert.ok(market.length>20);
-  assert.equal(market.some(p=>p.sellerId==='inter'),false);
+test('11v11 match exits kickoff, controls the ball and completes deterministically',()=>{
+  const build=()=>{const s=createCareer({playerName:'Test',nationality:'AR',position:'CAM',build:'technician',countryId:'AR',clubId:'river'});const f=nextFixture(s),home=lineup11(s,f.home),away=lineup11(s,f.away);return new MatchEngine(home,away,{homeName:f.home,awayName:f.away,homeTactics:s.world[f.home].tactics,awayTactics:s.world[f.away].tactics,userId:s.player.instanceId,seed:'fixed-11v11'});};
+  const run=()=>{const e=build();let hadOwner=false;for(let i=0;i<7000&&!e.finished;i++){e.step(.05);if(e.ball.ownerId)hadOwner=true;}assert.equal(e.finished,true);assert.equal(e.players.length,22);assert.equal(e.restart?.active,false);assert.equal(hadOwner,true);const touches=e.players.reduce((n,p)=>n+p.perf.touches,0);assert.ok(touches>10);assert.ok(e.stats.passes[0]+e.stats.passes[1]>0);return JSON.stringify({score:e.score,stats:e.stats,user:e.userPerformance()});};
+  assert.equal(run(),run());
 });

@@ -1,9 +1,7 @@
-name: Test game
-
+name: Test Career Eleven
 on:
   push:
   pull_request:
-
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -12,7 +10,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Syntax checks
-        run: npm run check
-      - name: Deterministic game tests
-        run: npm test
+      - run: npm run check
+      - run: npm test
