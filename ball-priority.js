@@ -63,7 +63,7 @@ function startWallPlay(engine,p,opponent){
 
 MatchEngine.prototype.prepareBallAction=function ballFirstPrepareBallAction(p){
   if(!p)return originalPrepareBallAction.call(this,p);
-  if(p.wallPlay){const active=wallPlayTarget(this,p);if(active)return;}
+  if(p.wallPlay){wallPlayTarget(this,p);if(p.wallPlay)return;}
   if(p.decisionCooldown<=0&&!p.kickIntent&&!p.dribbleIntent){
     const near=nearestOpponent(this,p);
     if(canUseWall(this,p,near.opponent,near.distance)&&startWallPlay(this,p,near.opponent))return;
