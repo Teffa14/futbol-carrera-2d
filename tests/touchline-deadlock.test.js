@@ -95,7 +95,7 @@ test('meaningful ball progress resets the five-minute deadlock clock while the d
 
   e.minute=17.2;
   assert.equal(e.trackDeadlockFallback(null),false);
-  assert.equal(e.restart?.kind==='free-kick'&&e.restart.active,true,false);
+  assert.equal(Boolean(e.restart?.kind==='free-kick'&&e.restart.active),false);
   assert.equal(resetAt,16.9,'meaningful movement must restart the fallback timer');
 });
 
