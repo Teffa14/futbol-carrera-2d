@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import '../kick-direction.js';
 import {createCareer,nextFixture,lineup11} from '../career.js';
 import {MatchEngine} from '../engine.js';
 
@@ -42,8 +43,8 @@ test('normal dribbling only moves the ball through physical circle contact',()=>
   assert.equal(engine.ball.lastPlayerId,player.id);
 });
 
-test('a kick can fire from the full circumference and follows the physical contact normal',()=>{
-  const engine=build('full-circle-kick');
+test('a kick can fire from the full circumference but leaves in the direction the player faces',()=>{
+  const engine=build('full-circle-facing-kick');
   engine.restart.active=false;
   const player=engine.players.find(p=>p.team===0&&p.role!=='GK');
   fieldAwayFrom(player,engine);
@@ -51,8 +52,22 @@ test('a kick can fire from the full circumference and follows the physical conta
   engine.ball.x=285;engine.ball.y=350;engine.ball.vx=0;engine.ball.vy=0;
   player.kickIntent={aimX:900,aimY:350,power:6,type:'pass',ttl:1,receiverId:null};
   engine.resolveBallPlayerCollisions();
-  assert.equal(player.kickIntent,null,'contact anywhere on the circle must be able to execute the armed kick');
-  assert.ok(engine.ball.vx<0,'a rear-side contact must kick radially away from the player, not through an artificial front cone');
+  assert.equal(player.kickIntent,null,'contact anywhere on the circle must still execute the armed kick');
+  assert.ok(engine.ball.vx>0,'rear-side contact must still kick in the player facing direction');
+  assert.ok(Math.abs(engine.ball.vy)<1,'horizontal facing should keep the kick approximately horizontal');
+});
+
+test('kick direction follows facing rather than the radial contact normal',()=>{
+  const engine=build('facing-over-normal');
+  engine.restart.active=false;
+  const player=engine.players.find(p=>p.team===0&&p.role!=='GK');
+  fieldAwayFrom(player,engine);
+  player.x=300;player.y=350;player.vx=0;player.vy=0;player.facingX=0;player.facingY=-1;player.kickCooldown=0;
+  engine.ball.x=315;engine.ball.y=350;engine.ball.vx=0;engine.ball.vy=0;
+  player.kickIntent={aimX:300,aimY:100,power:6,type:'pass',ttl:1,receiverId:null};
+  engine.resolveBallPlayerCollisions();
+  assert.ok(engine.ball.vy<0,'upward-facing player must kick upward');
+  assert.ok(Math.abs(engine.ball.vy)>Math.abs(engine.ball.vx)*3,'facing must dominate the side contact normal');
 });
 
 test('a player can rotate in place without needing translational movement',()=>{
@@ -79,6 +94,7 @@ test('body/dribble touches are materially softer than an intentional pass kick',
   const touchSpeed=Math.hypot(engine.ball.vx,engine.ball.vy);
 
   player.touchCooldown=0;player.kickCooldown=0;player.dribbleIntent=null;player.kickIntent={aimX:900,aimY:350,power:6,type:'pass',ttl:1};
+  player.facingX=1;player.facingY=0;
   engine.ball.x=315;engine.ball.y=350;engine.ball.vx=0;engine.ball.vy=0;engine.ball.lastTouchTick=-50;
   engine.resolveBallPlayerCollisions();
   const passSpeed=Math.hypot(engine.ball.vx,engine.ball.vy);
@@ -120,7 +136,7 @@ test('receiver movement cannot steer a free ball after the pass contact',()=>{
   const receiver=engine.players.find(p=>p.team===0&&p.role!=='GK'&&p.id!==passer.id);
   assert.ok(passer&&receiver);
   for(const p of engine.players)if(p.id!==passer.id&&p.id!==receiver.id){p.x=900;p.y=620;p.vx=0;p.vy=0;}
-  passer.x=300;passer.y=350;passer.vx=0;passer.vy=0;
+  passer.x=300;passer.y=350;passer.vx=0;passer.vy=0;passer.facingX=1;passer.facingY=0;
   receiver.x=500;receiver.y=350;receiver.vx=0;receiver.vy=0;
   engine.ball.x=315;engine.ball.y=350;engine.ball.vx=0;engine.ball.vy=0;
   engine.pass(passer,receiver);
@@ -135,7 +151,7 @@ test('receiver movement cannot steer a free ball after the pass contact',()=>{
 });
 
 test('full match exits kickoff, produces dribble attempts and completes with the ball permanently free',()=>{
-  const engine=build('full-360-dribble-physics');
+  const engine=build('full-facing-dribble-physics');
   let touched=false,freeFlight=false;
   for(let i=0;i<7000&&!engine.finished;i++){
     engine.step(.05);
