@@ -6,6 +6,7 @@ import '../ball-priority.js';
 import '../anti-cluster.js';
 import '../positional-ai.js';
 import {nearbyPlayableEdges,feasibleContactTarget,playerIdentity,__boundaryTest} from '../boundary-intelligence.js';
+import '../role-depth.js';
 
 const roles=['GK','RB','CB','CB','LB','CDM','CM','CAM','RW','ST','LW'];
 function lineup(prefix){return roles.map((role,i)=>({instanceId:`${prefix}-${i}`,id:`${prefix}-${i}`,name:`${prefix} ${role} ${i}`,position:role,engineRole:role,rating:72,pace:72,shooting:68,passing:72,dribbling:73,defense:68,physical:70,ballControl:74,vision:72,stamina:74,composure:71,fitness:100,skills:[],instructions:{risk:50,shoot:50,dribble:58}}));}
