@@ -32,8 +32,9 @@ test('controlled dribbling applies discrete impulses without moving the ball to 
 test('a pass is ballistic and never steers toward a receiver after the strike',()=>{
   const engine=build('ballistic-pass');
   engine.restart.active=false;
-  const passer=engine.players.find(p=>p.team===0&&p.role==='CM');
-  const receiver=engine.players.find(p=>p.team===0&&p.role==='RW');
+  const passer=engine.players.find(p=>p.team===0&&p.role!=='GK');
+  const receiver=engine.players.find(p=>p.team===0&&p.role!=='GK'&&p.id!==passer.id);
+  assert.ok(passer&&receiver);
   passer.x=300;passer.y=350;passer.vx=.8;passer.vy=0;
   receiver.x=500;receiver.y=360;receiver.vx=1.1;receiver.vy=.25;
   engine.ball.x=312;engine.ball.y=350;engine.ball.vx=0;engine.ball.vy=0;engine.ball.ownerId=passer.id;
