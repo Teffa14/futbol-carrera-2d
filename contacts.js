@@ -2,11 +2,16 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const mag=(x,y)=>Math.hypot(x,y);
 const unit=(x,y)=>{const l=mag(x,y)||1;return{x:x/l,y:y/l};};
 const dot=(ax,ay,bx,by)=>ax*bx+ay*by;
+const FIELD_LIMITS={minX:65,maxX:1035,minY:55,maxY:645,guard:30};
+const KISS_LOCK_TICKS=8;
+let contactFrame=0;
+const lockMemory=new WeakMap();
 
 function hashString(s){let h=2166136261;for(let i=0;i<String(s).length;i++){h^=String(s).charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
 function pairSide(a,b){const key=[String(a.id),String(b.id)].sort().join('|');return(hashString(key)&1)?1:-1;}
 function physical(p){return clamp(Number(p?.data?.physical??65),20,99);}
 function balance(p){const derived=physical(p)*.72+Number(p?.data?.dribbling??65)*.18+Number(p?.data?.ballControl??65)*.10;return clamp(Number(p?.data?.balance??derived),20,99);}
+function pairLockState(a,b){let byOpponent=lockMemory.get(a);if(!byOpponent){byOpponent=new WeakMap();lockMemory.set(a,byOpponent);}let state=byOpponent.get(b);if(!state){state={ticks:0,lastFrame:-99,mx:0,my:0};byOpponent.set(b,state);}return state;}
 
 export function effectiveMass(p){return .72+physical(p)/100*.88+balance(p)/100*.18;}
 
@@ -98,12 +103,13 @@ function shieldingExitTarget(p,desired,players,ball){
 export function steerAroundOpponent(p,target,players,ball){
   if(!p||!target)return target;
   updateContactPosture(p,players,ball);
-  const dx=target.x-p.x,dy=target.y-p.y,dlen=mag(dx,dy);if(dlen<18)return target;
-  const desired={x:dx/dlen,y:dy/dlen};
+  const dx=target.x-p.x,dy=target.y-p.y,dlen=mag(dx,dy);
+  const desired=dlen>.001?{x:dx/dlen,y:dy/dlen}:unit(Number(p.facingX)||1,Number(p.facingY)||0);
   const escape=activeEscapeTarget(p,desired);if(escape)return escape;
   const committedShieldExit=activeShieldExitTarget(p,desired);if(committedShieldExit)return committedShieldExit;
-  const shieldExit=shieldingExitTarget(p,desired,players,ball);if(shieldExit)return shieldExit;
   const drive=activeDriveTarget(p,desired);if(drive)return drive;
+  if(dlen<18)return target;
+  const shieldExit=shieldingExitTarget(p,desired,players,ball);if(shieldExit)return shieldExit;
   let blocker=null,best=Infinity;
   for(const o of players){
     if(o===p||o.team===p.team)continue;
@@ -140,7 +146,36 @@ function setDuelDrive(winner,vx,vy,edge){
   winner.contactDriveTicks=Math.max(Number(winner.contactDriveTicks)||0,4+Math.round(strengthGap*5));
 }
 
+function kissLockAxis(a,b,nx,ny){
+  const mx=(a.x+b.x)/2,my=(a.y+b.y)/2,side=pairSide(a,b);
+  if(my<=FIELD_LIMITS.minY+FIELD_LIMITS.guard||my>=FIELD_LIMITS.maxY-FIELD_LIMITS.guard)return{x:side,y:0};
+  if(mx<=FIELD_LIMITS.minX+FIELD_LIMITS.guard||mx>=FIELD_LIMITS.maxX-FIELD_LIMITS.guard)return{x:0,y:side};
+  return{x:-ny*side,y:nx*side};
+}
+
+function breakKissLock(a,b,nx,ny){
+  const axis=kissLockAxis(a,b,nx,ny),push=1.35,step=2.6;
+  a.x-=axis.x*step;a.y-=axis.y*step;b.x+=axis.x*step;b.y+=axis.y*step;
+  a.vx-=axis.x*push;a.vy-=axis.y*push;b.vx+=axis.x*push;b.vy+=axis.y*push;
+  a.contactEscapeX=-axis.x;a.contactEscapeY=-axis.y;a.contactEscapeTicks=Math.max(Number(a.contactEscapeTicks)||0,12);
+  b.contactEscapeX=axis.x;b.contactEscapeY=axis.y;b.contactEscapeTicks=Math.max(Number(b.contactEscapeTicks)||0,12);
+  a.contactDriveTicks=0;a.contactDriveX=0;a.contactDriveY=0;b.contactDriveTicks=0;b.contactDriveX=0;b.contactDriveY=0;
+  clearShieldExit(a);clearShieldExit(b);
+  a.contactLockBreaks=(Number(a.contactLockBreaks)||0)+1;b.contactLockBreaks=(Number(b.contactLockBreaks)||0)+1;
+}
+
+function updateKissLock(a,b,nx,ny,same){
+  if(same)return false;
+  const state=pairLockState(a,b),mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
+  const consecutive=state.lastFrame===contactFrame-1,centreMove=consecutive?mag(mx-state.mx,my-state.my):Infinity;
+  if(consecutive&&centreMove<.72)state.ticks+=1;else state.ticks=1;
+  state.lastFrame=contactFrame;state.mx=mx;state.my=my;
+  if(state.ticks<KISS_LOCK_TICKS)return false;
+  breakKissLock(a,b,nx,ny);state.ticks=0;return true;
+}
+
 export function resolvePlayerContacts(players){
+  contactFrame++;
   const contacts=[];
   for(let i=0;i<players.length;i++)for(let j=i+1;j<players.length;j++){
     const a=players[i],b=players[j],dx=b.x-a.x,dy=b.y-a.y,d=mag(dx,dy)||.0001,min=(a.r??10)+(b.r??10);
@@ -184,7 +219,8 @@ export function resolvePlayerContacts(players){
       if(edge>0){setDuelEscape(b,a,nx,ny,true,edge);setDuelDrive(a,preAvx,preAvy,edge);}
       else{setDuelEscape(a,b,nx,ny,false,edge);setDuelDrive(b,preBvx,preBvy,edge);}
     }
-    contacts.push({a,b,edge,headOn,leverageA,leverageB});
+    const lockBroken=updateKissLock(a,b,nx,ny,same);
+    contacts.push({a,b,edge,headOn,leverageA,leverageB,lockBroken});
   }
   return contacts;
 }
