@@ -6,12 +6,37 @@ const dot=(ax,ay,bx,by)=>ax*bx+ay*by;
 function hashString(s){let h=2166136261;for(let i=0;i<String(s).length;i++){h^=String(s).charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
 function pairSide(a,b){const key=[String(a.id),String(b.id)].sort().join('|');return(hashString(key)&1)?1:-1;}
 function physical(p){return clamp(Number(p?.data?.physical??65),20,99);}
-function balance(p){return clamp(physical(p)*.72+Number(p?.data?.dribbling??65)*.18+Number(p?.data?.ballControl??65)*.10,20,99);}
+function balance(p){const derived=physical(p)*.72+Number(p?.data?.dribbling??65)*.18+Number(p?.data?.ballControl??65)*.10;return clamp(Number(p?.data?.balance??derived),20,99);}
 
 export function effectiveMass(p){return .72+physical(p)/100*.88+balance(p)/100*.18;}
 
+export function shieldingLeverage(p,opponent,ball){
+  if(!p||!opponent||!ball||p.team===opponent.team)return 0;
+  const pbx=ball.x-p.x,pby=ball.y-p.y,opx=opponent.x-p.x,opy=opponent.y-p.y;
+  const ballDistance=mag(pbx,pby),opponentDistance=mag(opx,opy);
+  if(ballDistance<.001||opponentDistance<.001||ballDistance>32||opponentDistance>34)return 0;
+  const toBall=unit(pbx,pby),toOpponent=unit(opx,opy);
+  const bodyBetween=-dot(toBall.x,toBall.y,toOpponent.x,toOpponent.y);
+  if(bodyBetween<.55)return 0;
+  const geometry=clamp((bodyBetween-.55)/.45,0,1);
+  const strength=(physical(p)*.62+balance(p)*.38)/100;
+  return clamp(geometry*(.08+strength*.26),0,.34);
+}
+
+function updateContactPosture(p,players,ball){
+  if(!p||!ball){if(p)p.contactLeverage=0;return;}
+  let opponent=null,best=Infinity;
+  for(const o of players){
+    if(o===p||o.team===p.team)continue;
+    const d=mag(o.x-p.x,o.y-p.y);
+    if(d<best){best=d;opponent=o;}
+  }
+  p.contactLeverage=opponent?shieldingLeverage(p,opponent,ball):0;
+}
+
 export function steerAroundOpponent(p,target,players,ball){
   if(!p||!target)return target;
+  updateContactPosture(p,players,ball);
   const dx=target.x-p.x,dy=target.y-p.y,dlen=mag(dx,dy);if(dlen<18)return target;
   const desired={x:dx/dlen,y:dy/dlen};
   let blocker=null,best=Infinity;
@@ -40,7 +65,8 @@ export function resolvePlayerContacts(players){
     const nx=dx/d,ny=dy/d,over=min-d+.08,same=a.team===b.team;
     const preAForward=Math.max(0,dot(a.vx,a.vy,nx,ny)),preBForward=Math.max(0,-dot(b.vx,b.vy,nx,ny));
     const preASpeed=mag(a.vx,a.vy),preBSpeed=mag(b.vx,b.vy);
-    const massA=same?1:effectiveMass(a),massB=same?1:effectiveMass(b),invA=1/massA,invB=1/massB,invTotal=invA+invB;
+    const leverageA=same?0:clamp(Number(a.contactLeverage)||0,0,.34),leverageB=same?0:clamp(Number(b.contactLeverage)||0,0,.34);
+    const massA=(same?1:effectiveMass(a))*(1+leverageA),massB=(same?1:effectiveMass(b))*(1+leverageB),invA=1/massA,invB=1/massB,invTotal=invA+invB;
     const moveA=over*(invA/invTotal),moveB=over*(invB/invTotal);
     a.x-=nx*moveA;a.y-=ny*moveA;b.x+=nx*moveB;b.y+=ny*moveB;
 
@@ -50,8 +76,8 @@ export function resolvePlayerContacts(players){
       a.vx-=nx*jimp*invA;a.vy-=ny*jimp*invA;b.vx+=nx*jimp*invB;b.vy+=ny*jimp*invB;
     }
 
-    const forceA=physical(a)*.72+balance(a)*.16+preASpeed*5+preAForward*9;
-    const forceB=physical(b)*.72+balance(b)*.16+preBSpeed*5+preBForward*9;
+    const forceA=physical(a)*.72+balance(a)*.16+preASpeed*5+preAForward*9+leverageA*22;
+    const forceB=physical(b)*.72+balance(b)*.16+preBSpeed*5+preBForward*9+leverageB*22;
     const edge=clamp((forceA-forceB)/85,-.75,.75);
 
     if(!same&&Math.abs(edge)>.035){
@@ -69,7 +95,7 @@ export function resolvePlayerContacts(players){
       a.x+=tx*(equal?.22:weakerA?.34:.08);a.y+=ty*(equal?.22:weakerA?.34:.08);
       b.x-=tx*(equal?.22:weakerB?.34:.08);b.y-=ty*(equal?.22:weakerB?.34:.08);
     }
-    contacts.push({a,b,edge,headOn});
+    contacts.push({a,b,edge,headOn,leverageA,leverageB});
   }
   return contacts;
 }
