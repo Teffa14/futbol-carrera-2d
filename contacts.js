@@ -35,6 +35,8 @@ function updateContactPosture(p,players,ball){
   p.contactLeverage=opponent?shieldingLeverage(p,opponent,ball):0;
 }
 
+function clearShieldExit(p){p.contactShieldExitTicks=0;p.contactShieldExitX=0;p.contactShieldExitY=0;p.contactShieldOpponentId=null;}
+
 function activeEscapeTarget(p,desired){
   const ticks=Math.max(0,Number(p.contactEscapeTicks)||0);
   if(ticks<=0)return null;
@@ -43,6 +45,18 @@ function activeEscapeTarget(p,desired){
   if(p.contactEscapeTicks<=0){p.contactEscapeX=0;p.contactEscapeY=0;}
   const sideStep=22+Math.min(18,ticks*1.5);
   return{x:p.x+desired.x*20+escape.x*sideStep,y:p.y+desired.y*20+escape.y*sideStep};
+}
+
+function activeShieldExitTarget(p,desired){
+  const ticks=Math.max(0,Number(p.contactShieldExitTicks)||0);
+  if(ticks<=0)return null;
+  const exit=unit(Number(p.contactShieldExitX)||0,Number(p.contactShieldExitY)||0);
+  if(mag(exit.x,exit.y)<.5){clearShieldExit(p);return null;}
+  p.contactShieldExitTicks=ticks-1;
+  if(p.contactShieldExitTicks<=0)clearShieldExit(p);
+  const commitment=clamp(.72+ticks*.025,.72,.90);
+  const combined=unit(exit.x*commitment+desired.x*(1-commitment),exit.y*commitment+desired.y*(1-commitment));
+  return{x:p.x+combined.x*38,y:p.y+combined.y*38};
 }
 
 function activeDriveTarget(p,desired){
@@ -76,6 +90,8 @@ function shieldingExitTarget(p,desired,players,ball){
   const tangent={x:left.x*side,y:left.y*side};
   const turn=unit(toBall.x*(.18+leverage*.18)+tangent.x*(.96-leverage*.08),toBall.y*(.18+leverage*.18)+tangent.y*(.96-leverage*.08));
   const stride=30+leverage*24;
+  p.contactShieldExitX=turn.x;p.contactShieldExitY=turn.y;p.contactShieldOpponentId=opponent.id;
+  p.contactShieldExitTicks=Math.max(Number(p.contactShieldExitTicks)||0,6+Math.round(leverage*12));
   return{x:p.x+turn.x*stride,y:p.y+turn.y*stride};
 }
 
@@ -85,6 +101,7 @@ export function steerAroundOpponent(p,target,players,ball){
   const dx=target.x-p.x,dy=target.y-p.y,dlen=mag(dx,dy);if(dlen<18)return target;
   const desired={x:dx/dlen,y:dy/dlen};
   const escape=activeEscapeTarget(p,desired);if(escape)return escape;
+  const committedShieldExit=activeShieldExitTarget(p,desired);if(committedShieldExit)return committedShieldExit;
   const shieldExit=shieldingExitTarget(p,desired,players,ball);if(shieldExit)return shieldExit;
   const drive=activeDriveTarget(p,desired);if(drive)return drive;
   let blocker=null,best=Infinity;
@@ -113,7 +130,7 @@ function setDuelEscape(loser,winner,nx,ny,winnerIsA,edge){
   const escape=unit(awayX*(.42+strengthGap*.18)+lateralX*.82,awayY*(.42+strengthGap*.18)+lateralY*.82);
   loser.contactEscapeX=escape.x;loser.contactEscapeY=escape.y;
   loser.contactEscapeTicks=Math.max(Number(loser.contactEscapeTicks)||0,6+Math.round(strengthGap*6));
-  loser.contactDriveTicks=0;loser.contactDriveX=0;loser.contactDriveY=0;
+  loser.contactDriveTicks=0;loser.contactDriveX=0;loser.contactDriveY=0;clearShieldExit(loser);
 }
 
 function setDuelDrive(winner,vx,vy,edge){
