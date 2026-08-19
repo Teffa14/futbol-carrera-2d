@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {MatchEngine} from '../engine.js';
-import {MATCH_BALL_RADIUS,assignMatchSquadNumbers} from '../match-presentation.js';
+import {MATCH_BALL_RADIUS,MOBILE_MATCH_CSS,assignMatchSquadNumbers} from '../match-presentation.js';
 
 const roles=['GK','RB','CB','CB','LB','CDM','CM','CAM','RW','ST','LW'];
 function lineup(prefix){return roles.map((role,i)=>({instanceId:`${prefix}-${i}`,id:`${prefix}-${i}`,name:`${prefix} ${i}`,position:role,engineRole:role,rating:68,pace:68,shooting:62,passing:66,dribbling:65,defense:62,physical:66,ballControl:66,vision:65,stamina:70,composure:65,fitness:100,skills:[]}));}
@@ -45,4 +45,19 @@ test('shirt number is rendered inside the player circle',()=>{
   e.drawPlayer(ctx,p);
   const number=String(p.data.squadNumber);
   assert.equal(text.some(([kind,value,x,y])=>kind==='fill'&&value===number&&x===p.x&&y===p.y+.5),true);
+});
+
+test('mobile match CSS constrains canvas and controls instead of widening the viewport',()=>{
+  assert.match(MOBILE_MATCH_CSS,/text-size-adjust:100%/);
+  assert.match(MOBILE_MATCH_CSS,/#canvas\{[^}]*width:100%!important/);
+  assert.match(MOBILE_MATCH_CSS,/\.match-controls>div\{display:grid;grid-template-columns:repeat\(5,minmax\(0,1fr\)\)/);
+  assert.match(MOBILE_MATCH_CSS,/@media\(max-width:430px\)/);
+});
+
+test('the duplicate in-canvas player badge is disabled because the HTML live HUD owns those stats',()=>{
+  const e=engine();
+  let draws=0;
+  const ctx={fillRect(){draws++;},fillText(){draws++;},save(){},restore(){}};
+  e.drawUserBadge(ctx,e.players[0],1100,700);
+  assert.equal(draws,0);
 });
