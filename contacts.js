@@ -38,6 +38,8 @@ export function resolvePlayerContacts(players){
     const a=players[i],b=players[j],dx=b.x-a.x,dy=b.y-a.y,d=mag(dx,dy)||.0001,min=(a.r??10)+(b.r??10);
     if(d>=min)continue;
     const nx=dx/d,ny=dy/d,over=min-d+.08,same=a.team===b.team;
+    const preAForward=Math.max(0,dot(a.vx,a.vy,nx,ny)),preBForward=Math.max(0,-dot(b.vx,b.vy,nx,ny));
+    const preASpeed=mag(a.vx,a.vy),preBSpeed=mag(b.vx,b.vy);
     const massA=same?1:effectiveMass(a),massB=same?1:effectiveMass(b),invA=1/massA,invB=1/massB,invTotal=invA+invB;
     const moveA=over*(invA/invTotal),moveB=over*(invB/invTotal);
     a.x-=nx*moveA;a.y-=ny*moveA;b.x+=nx*moveB;b.y+=ny*moveB;
@@ -48,9 +50,8 @@ export function resolvePlayerContacts(players){
       a.vx-=nx*jimp*invA;a.vy-=ny*jimp*invA;b.vx+=nx*jimp*invB;b.vy+=ny*jimp*invB;
     }
 
-    const aForward=Math.max(0,dot(a.vx,a.vy,nx,ny)),bForward=Math.max(0,-dot(b.vx,b.vy,nx,ny));
-    const forceA=physical(a)*.72+balance(a)*.16+mag(a.vx,a.vy)*5+aForward*9;
-    const forceB=physical(b)*.72+balance(b)*.16+mag(b.vx,b.vy)*5+bForward*9;
+    const forceA=physical(a)*.72+balance(a)*.16+preASpeed*5+preAForward*9;
+    const forceB=physical(b)*.72+balance(b)*.16+preBSpeed*5+preBForward*9;
     const edge=clamp((forceA-forceB)/85,-.75,.75);
 
     if(!same&&Math.abs(edge)>.035){
@@ -59,7 +60,7 @@ export function resolvePlayerContacts(players){
       else{a.vx-=nx*shove;a.vy-=ny*shove;b.vx-=nx*shove*.10;b.vy-=ny*shove*.10;}
     }
 
-    const headOn=!same&&aForward>.10&&bForward>.10;
+    const headOn=!same&&preAForward>.10&&preBForward>.10;
     if(headOn){
       const side=pairSide(a,b),tx=-ny*side,ty=nx*side;
       const weakerA=edge<0,weakerB=edge>0,equal=Math.abs(edge)<.12;
