@@ -1,19 +1,18 @@
-name: Smoke check
+name: Test game
 
 on:
   push:
   pull_request:
 
 jobs:
-  syntax:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Check browser JavaScript syntax
-        run: |
-          node --check app.js
-          node --check data.js
-          node --check engine.js
+      - name: Syntax checks
+        run: npm run check
+      - name: Deterministic game tests
+        run: npm test
