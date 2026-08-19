@@ -3,5 +3,5 @@
   "version":"0.4.0",
   "private":true,
   "type":"module",
-  "scripts":{"check":"node --check app.js && node --check data.js && node --check career.js && node --check tactics.js && node --check engine.js","test":"node --test tests/*.test.js"}
+  "scripts":{"check":"node --check app.js && node --check data.js && node --check career.js && node --check tactics.js && node --check contacts.js && node --check engine.js","test":"node --test tests/*.test.js"}
 }
