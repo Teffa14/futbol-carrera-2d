@@ -81,16 +81,19 @@ test('five simulated minutes of a local deadlock awards a free kick to the team 
   assert.ok(e.events.some(x=>x.text.includes('Tiro libre')));
 });
 
-test('meaningful ball progress resets the five-minute deadlock clock',()=>{
+test('meaningful ball progress resets the five-minute deadlock clock while the duel remains contested',()=>{
   const e=build('deadlock-progress-reset');
   const a=e.players.find(x=>x.team===0&&x.role!=='GK'),b=e.players.find(x=>x.team===1&&x.role!=='GK');
   e.ball.x=500;e.ball.y=60;e.ball.vx=0;e.ball.vy=0;
   a.x=490;a.y=60;b.x=510;b.y=60;e.lastPossessionTeam=1;e.minute=12;
   e.trackDeadlockFallback(1);
-  e.minute=16.9;e.ball.x=545;
+
+  e.minute=16.9;e.ball.x=545;a.x=535;b.x=555;
   assert.equal(e.trackDeadlockFallback(null),false);
+  assert.ok(e.deadlock,'continued opposing pressure should start a fresh deadlock episode at the new location');
   const resetAt=e.deadlock.startMinute;
-  e.ball.x=545;e.minute=17.2;
+
+  e.minute=17.2;
   assert.equal(e.trackDeadlockFallback(null),false);
   assert.equal(e.restart?.kind==='free-kick'&&e.restart.active,true,false);
   assert.equal(resetAt,16.9,'meaningful movement must restart the fallback timer');
@@ -98,7 +101,7 @@ test('meaningful ball progress resets the five-minute deadlock clock',()=>{
 
 test('deadlock free kick resumes as a physical kick instead of attaching the ball to the taker',()=>{
   const e=build('free-kick-release');
-  e.ball.x=500;e.ball.y=60;e.lastTeam=0;e.lastPossessionTeam=0;
+  e.ball.x=500;e.ball.y=60;e.ball.lastTeam=0;e.lastPossessionTeam=0;
   assert.equal(e.awardDeadlockFreeKick(0),true);
   assert.equal('ownerId' in e.ball,false);
   for(let i=0;i<30;i++)e.step(.05);
