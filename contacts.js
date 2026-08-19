@@ -44,12 +44,24 @@ function activeEscapeTarget(p,desired){
   return{x:p.x+desired.x*20+escape.x*sideStep,y:p.y+desired.y*20+escape.y*sideStep};
 }
 
+function activeDriveTarget(p,desired){
+  const ticks=Math.max(0,Number(p.contactDriveTicks)||0);
+  if(ticks<=0)return null;
+  const drive=unit(Number(p.contactDriveX)||0,Number(p.contactDriveY)||0);
+  p.contactDriveTicks=ticks-1;
+  if(p.contactDriveTicks<=0){p.contactDriveX=0;p.contactDriveY=0;}
+  const weight=clamp(.24+ticks*.025,.24,.42);
+  const combined=unit(desired.x*(1-weight)+drive.x*weight,desired.y*(1-weight)+drive.y*weight);
+  return{x:p.x+combined.x*42,y:p.y+combined.y*42};
+}
+
 export function steerAroundOpponent(p,target,players,ball){
   if(!p||!target)return target;
   updateContactPosture(p,players,ball);
   const dx=target.x-p.x,dy=target.y-p.y,dlen=mag(dx,dy);if(dlen<18)return target;
   const desired={x:dx/dlen,y:dy/dlen};
   const escape=activeEscapeTarget(p,desired);if(escape)return escape;
+  const drive=activeDriveTarget(p,desired);if(drive)return drive;
   let blocker=null,best=Infinity;
   for(const o of players){
     if(o===p||o.team===p.team)continue;
@@ -76,6 +88,14 @@ function setDuelEscape(loser,winner,nx,ny,winnerIsA,edge){
   const escape=unit(awayX*(.42+strengthGap*.18)+lateralX*.82,awayY*(.42+strengthGap*.18)+lateralY*.82);
   loser.contactEscapeX=escape.x;loser.contactEscapeY=escape.y;
   loser.contactEscapeTicks=Math.max(Number(loser.contactEscapeTicks)||0,6+Math.round(strengthGap*6));
+  loser.contactDriveTicks=0;loser.contactDriveX=0;loser.contactDriveY=0;
+}
+
+function setDuelDrive(winner,vx,vy,edge){
+  const speed=mag(vx,vy);if(speed<.18)return;
+  const drive=unit(vx,vy),strengthGap=clamp(Math.abs(edge),0,1);
+  winner.contactDriveX=drive.x;winner.contactDriveY=drive.y;
+  winner.contactDriveTicks=Math.max(Number(winner.contactDriveTicks)||0,4+Math.round(strengthGap*5));
 }
 
 export function resolvePlayerContacts(players){
@@ -84,8 +104,9 @@ export function resolvePlayerContacts(players){
     const a=players[i],b=players[j],dx=b.x-a.x,dy=b.y-a.y,d=mag(dx,dy)||.0001,min=(a.r??10)+(b.r??10);
     if(d>=min)continue;
     const nx=dx/d,ny=dy/d,over=min-d+.08,same=a.team===b.team;
-    const preAForward=Math.max(0,dot(a.vx,a.vy,nx,ny)),preBForward=Math.max(0,-dot(b.vx,b.vy,nx,ny));
-    const preASpeed=mag(a.vx,a.vy),preBSpeed=mag(b.vx,b.vy);
+    const preAvx=a.vx,preAvy=a.vy,preBvx=b.vx,preBvy=b.vy;
+    const preAForward=Math.max(0,dot(preAvx,preAvy,nx,ny)),preBForward=Math.max(0,-dot(preBvx,preBvy,nx,ny));
+    const preASpeed=mag(preAvx,preAvy),preBSpeed=mag(preBvx,preBvy);
     const leverageA=same?0:clamp(Number(a.contactLeverage)||0,0,.34),leverageB=same?0:clamp(Number(b.contactLeverage)||0,0,.34);
     const massA=(same?1:effectiveMass(a))*(1+leverageA),massB=(same?1:effectiveMass(b))*(1+leverageB),invA=1/massA,invB=1/massB,invTotal=invA+invB;
     const moveA=over*(invA/invTotal),moveB=over*(invB/invTotal);
@@ -118,8 +139,8 @@ export function resolvePlayerContacts(players){
     }
 
     if(!same&&Math.abs(edge)>=.08){
-      if(edge>0)setDuelEscape(b,a,nx,ny,true,edge);
-      else setDuelEscape(a,b,nx,ny,false,edge);
+      if(edge>0){setDuelEscape(b,a,nx,ny,true,edge);setDuelDrive(a,preAvx,preAvy,edge);}
+      else{setDuelEscape(a,b,nx,ny,false,edge);setDuelDrive(b,preBvx,preBvy,edge);}
     }
     contacts.push({a,b,edge,headOn,leverageA,leverageB});
   }
