@@ -20,7 +20,9 @@
 
 ## Match engine
 
-`engine.js` is original project code. The current engine models 22 players, controlled possession, dribbling, passing, shooting, physical contests, interceptions, goalkeeper saves, stamina, live player performance and a camera that follows the created player.
+`engine.js` and `contacts.js` are original project code. The engine models 22 players and a permanently free ball. There is no ball owner, capture, attachment or magnetic-control state. Dribbling emerges from repeated player-ball collisions. Passes and shots are armed as player intentions but only change ball velocity when physical contact occurs, in the direction the player is facing.
+
+Player-player contests use effective mass, Physical, derived or explicit balance, momentum transfer, lateral deadlock escape, path steering and body-position shielding leverage. Those systems affect player movement only and never reposition, steer or attach the ball.
 
 HaxBall is not used as the product name or represented as the engine implementation. Publicly documented disc-physics concepts were only an early calibration reference for ideas such as damping, radius, collision and kick impulse.
 
