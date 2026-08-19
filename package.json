@@ -4,7 +4,7 @@
   "private":true,
   "type":"module",
   "scripts":{
-    "check":"node --check app.js && node --check data.js && node --check career.js && node --check tactics.js && node --check contacts.js && node --check duels.js && node --check engine.js && node --check kick-direction.js && node --check match-presentation.js && node --check ball-priority.js && node --check anti-cluster.js && node --check positional-ai.js && node --check kit-contrast.js",
+    "check":"node --check app.js && node --check data.js && node --check career.js && node --check tactics.js && node --check contacts.js && node --check duels.js && node --check engine.js && node --check kick-direction.js && node --check match-presentation.js && node --check ball-priority.js && node --check anti-cluster.js && node --check positional-ai.js && node --check boundary-intelligence.js && node --check role-depth.js && node --check kit-contrast.js",
     "test":"node --test tests/*.test.js"
   }
 }
