@@ -1,0 +1,5 @@
+Wall actor: may reach physical touchline contact.
+Opposing actors: approach from opposite football sides.
+Off-ball roles: keep distinct support/rest-defence targets.
+Non-actors: do not collapse onto a loose wall ball.
+Boundary guard: still applies to non-actors.
