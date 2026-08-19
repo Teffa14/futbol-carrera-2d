@@ -1,0 +1,61 @@
+import {MatchEngine} from './engine.js';
+
+export const MATCH_BALL_RADIUS=5;
+
+const ROLE_NUMBERS={
+  GK:[1,12,13],RB:[2,22],LB:[3,23],CB:[4,5,6,14],CDM:[5,6,16],CM:[8,6,18],CAM:[10,8,20],RW:[7,17,27],LW:[11,19,21],ST:[9,18,99]
+};
+
+function hashString(value){let h=2166136261;for(const ch of String(value)){h^=ch.charCodeAt(0);h=Math.imul(h,16777619);}return h>>>0;}
+function validNumber(value){const n=Number(value);return Number.isInteger(n)&&n>=1&&n<=99?n:null;}
+function playerKey(player){return String(player?.id||player?.data?.instanceId||player?.data?.id||player?.data?.name||'player');}
+
+export function assignMatchSquadNumbers(players){
+  const used=new Set();
+  const ordered=[...players].sort((a,b)=>playerKey(a).localeCompare(playerKey(b)));
+  for(const player of ordered){
+    const existing=validNumber(player.data?.squadNumber);
+    if(existing&&!used.has(existing)){used.add(existing);continue;}
+    const preferred=ROLE_NUMBERS[player.role]||[];
+    let number=preferred.find(n=>!used.has(n));
+    if(!number){
+      const start=1+(hashString(playerKey(player))%99);
+      for(let offset=0;offset<99;offset++){
+        const candidate=1+((start-1+offset*37)%99);
+        if(!used.has(candidate)){number=candidate;break;}
+      }
+    }
+    number=number||1;
+    player.data.squadNumber=number;
+    used.add(number);
+  }
+  return players;
+}
+
+const originalMakeTeam=MatchEngine.prototype.makeTeam;
+MatchEngine.prototype.makeTeam=function makeTeamWithSquadNumbers(lineup,team){
+  const before=this.players.length;
+  const result=originalMakeTeam.call(this,lineup,team);
+  assignMatchSquadNumbers(this.players.slice(before));
+  return result;
+};
+
+const originalResetPositions=MatchEngine.prototype.resetPositions;
+MatchEngine.prototype.resetPositions=function resetPositionsWithSmallerBall(...args){
+  const result=originalResetPositions.apply(this,args);
+  this.ball.r=MATCH_BALL_RADIUS;
+  return result;
+};
+
+const originalDrawPlayer=MatchEngine.prototype.drawPlayer;
+MatchEngine.prototype.drawPlayer=function drawPlayerWithShirtNumber(ctx,player){
+  originalDrawPlayer.call(this,ctx,player);
+  const number=validNumber(player.data?.squadNumber);
+  if(!number)return;
+  ctx.save();
+  ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='900 8px system-ui';
+  ctx.lineWidth=2.4;ctx.strokeStyle='rgba(0,0,0,.72)';ctx.fillStyle='#fff';
+  ctx.strokeText(String(number),player.x,player.y+.5);
+  ctx.fillText(String(number),player.x,player.y+.5);
+  ctx.restore();
+};
