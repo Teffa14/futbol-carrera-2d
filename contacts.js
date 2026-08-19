@@ -34,11 +34,22 @@ function updateContactPosture(p,players,ball){
   p.contactLeverage=opponent?shieldingLeverage(p,opponent,ball):0;
 }
 
+function activeEscapeTarget(p,desired){
+  const ticks=Math.max(0,Number(p.contactEscapeTicks)||0);
+  if(ticks<=0)return null;
+  const escape=unit(Number(p.contactEscapeX)||0,Number(p.contactEscapeY)||0);
+  p.contactEscapeTicks=ticks-1;
+  if(p.contactEscapeTicks<=0){p.contactEscapeX=0;p.contactEscapeY=0;}
+  const sideStep=22+Math.min(18,ticks*1.5);
+  return{x:p.x+desired.x*20+escape.x*sideStep,y:p.y+desired.y*20+escape.y*sideStep};
+}
+
 export function steerAroundOpponent(p,target,players,ball){
   if(!p||!target)return target;
   updateContactPosture(p,players,ball);
   const dx=target.x-p.x,dy=target.y-p.y,dlen=mag(dx,dy);if(dlen<18)return target;
   const desired={x:dx/dlen,y:dy/dlen};
+  const escape=activeEscapeTarget(p,desired);if(escape)return escape;
   let blocker=null,best=Infinity;
   for(const o of players){
     if(o===p||o.team===p.team)continue;
@@ -55,6 +66,16 @@ export function steerAroundOpponent(p,target,players,ball){
     if(mag(ballDx,ballDy)<70){sx=p.x+desired.x*34+perp.x*corridor;sy=p.y+desired.y*34+perp.y*corridor;}
   }
   return{x:sx,y:sy};
+}
+
+function setDuelEscape(loser,winner,nx,ny,winnerIsA,edge){
+  const side=pairSide(loser,winner);
+  const awayX=winnerIsA?nx:-nx,awayY=winnerIsA?ny:-ny;
+  const lateralX=-awayY*side,lateralY=awayX*side;
+  const strengthGap=clamp(Math.abs(edge),0,1);
+  const escape=unit(awayX*(.42+strengthGap*.18)+lateralX*.82,awayY*(.42+strengthGap*.18)+lateralY*.82);
+  loser.contactEscapeX=escape.x;loser.contactEscapeY=escape.y;
+  loser.contactEscapeTicks=Math.max(Number(loser.contactEscapeTicks)||0,6+Math.round(strengthGap*6));
 }
 
 export function resolvePlayerContacts(players){
@@ -94,6 +115,11 @@ export function resolvePlayerContacts(players){
       a.vx+=tx*slideA;a.vy+=ty*slideA;b.vx-=tx*slideB;b.vy-=ty*slideB;
       a.x+=tx*(equal?.22:weakerA?.34:.08);a.y+=ty*(equal?.22:weakerA?.34:.08);
       b.x-=tx*(equal?.22:weakerB?.34:.08);b.y-=ty*(equal?.22:weakerB?.34:.08);
+    }
+
+    if(!same&&Math.abs(edge)>=.08){
+      if(edge>0)setDuelEscape(b,a,nx,ny,true,edge);
+      else setDuelEscape(a,b,nx,ny,false,edge);
     }
     contacts.push({a,b,edge,headOn,leverageA,leverageB});
   }
