@@ -24,13 +24,14 @@ export function shieldingLeverage(p,opponent,ball){
 }
 
 function updateContactPosture(p,players,ball){
-  if(!p||!ball){if(p)p.contactLeverage=0;return;}
+  if(!p||!ball){if(p){p.contactLeverage=0;p.contactOpponentId=null;}return;}
   let opponent=null,best=Infinity;
   for(const o of players){
     if(o===p||o.team===p.team)continue;
     const d=mag(o.x-p.x,o.y-p.y);
     if(d<best){best=d;opponent=o;}
   }
+  p.contactOpponentId=opponent?.id||null;
   p.contactLeverage=opponent?shieldingLeverage(p,opponent,ball):0;
 }
 
@@ -55,12 +56,36 @@ function activeDriveTarget(p,desired){
   return{x:p.x+combined.x*42,y:p.y+combined.y*42};
 }
 
+function shieldingExitTarget(p,desired,players,ball){
+  const leverage=clamp(Number(p.contactLeverage)||0,0,.34);
+  if(leverage<.10||!ball)return null;
+  const ballDx=ball.x-p.x,ballDy=ball.y-p.y,ballDistance=mag(ballDx,ballDy);
+  if(ballDistance<.001||ballDistance>34)return null;
+  let opponent=null,best=Infinity;
+  for(const o of players){
+    if(o===p||o.team===p.team)continue;
+    const d=mag(o.x-p.x,o.y-p.y);
+    if(d<best){best=d;opponent=o;}
+  }
+  if(!opponent||best>36)return null;
+  const toBall=unit(ballDx,ballDy),toOpponent=unit(opponent.x-p.x,opponent.y-p.y);
+  if(dot(toBall.x,toBall.y,toOpponent.x,toOpponent.y)>-.50)return null;
+
+  const left={x:-toBall.y,y:toBall.x},desiredLateral=dot(desired.x,desired.y,left.x,left.y);
+  const side=Math.abs(desiredLateral)>.16?Math.sign(desiredLateral):pairSide(p,opponent);
+  const tangent={x:left.x*side,y:left.y*side};
+  const turn=unit(toBall.x*(.18+leverage*.18)+tangent.x*(.96-leverage*.08),toBall.y*(.18+leverage*.18)+tangent.y*(.96-leverage*.08));
+  const stride=30+leverage*24;
+  return{x:p.x+turn.x*stride,y:p.y+turn.y*stride};
+}
+
 export function steerAroundOpponent(p,target,players,ball){
   if(!p||!target)return target;
   updateContactPosture(p,players,ball);
   const dx=target.x-p.x,dy=target.y-p.y,dlen=mag(dx,dy);if(dlen<18)return target;
   const desired={x:dx/dlen,y:dy/dlen};
   const escape=activeEscapeTarget(p,desired);if(escape)return escape;
+  const shieldExit=shieldingExitTarget(p,desired,players,ball);if(shieldExit)return shieldExit;
   const drive=activeDriveTarget(p,desired);if(drive)return drive;
   let blocker=null,best=Infinity;
   for(const o of players){
