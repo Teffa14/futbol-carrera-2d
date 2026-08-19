@@ -2,36 +2,44 @@
 
 Browser-first **player career** game with an original 11v11 autoplay football engine.
 
-This repository no longer presents the product as a HaxBall manager. HaxBall remains only a historical reference for simple disc-physics ideas. The game itself is now centered on one created footballer inside a full 22-player match.
+The product is not presented as HaxBall. HaxBall is only a historical reference for simple disc-physics concepts. Career Eleven is centered on one created footballer inside a full 22-player match.
 
 ## Current direction
 
-- Create one player: name, nationality, position and build.
-- The name field starts empty. No personal name is hard-coded as a default.
-- Eight countries / leagues with six clubs each.
+- Create one player: name, nationality, exact position and build.
+- The name field starts empty and the setup preserves the typed name while changing build, position, country or club.
+- Eight playable league structures with full current club counts: England 20, Spain 20, Italy 20, Germany 18, France 18, Brazil 20, Portugal 18 and Argentina 30.
 - Full 11v11 autoplay matches: 22 independently simulated players.
-- Ball possession is a real engine state. A player can control and carry the ball instead of every touch becoming an immediate pass/kick.
-- Dribbling, first touch, shielding, physical duels, tackles, interceptions, passes, shots, goalkeeper saves and stamina.
-- The created player is always visually identifiable with a dedicated ring / pointer.
+- The ball has no logical owner and is never attached/interpolated to a player. It travels through free physics, circle contacts and kicks.
+- Dribbling is represented by repeated physical touches/impulses rather than magnetic carrying.
+- Strength-aware player contact: Physical affects effective mass, displacement and shoulder contests; head-on contacts have lateral escape logic instead of permanent deadlocks.
+- Exact created-player role is prioritised in formation slot assignment. Choosing CAM, LB, ST, etc. keeps that role in the match engine.
+- Off-ball positioning uses team shape, ball location, possession inference, pressing roles and movement targets rather than every player chasing the ball.
+- The created player is visually identifiable with a dedicated ring / pointer.
 - Player-follow camera plus minimap.
-- Live individual match rating.
-- Live individual stats: goals, assists, passes, dribbles, shots, tackles, interceptions and turnovers.
+- Live individual match rating and individual match stats.
 - Attributes have direct engine effects: pace, shooting, passing, dribbling, defense, physical, ball control, vision, stamina and composure.
 - Seven career builds and an equipable skill/perk system.
-- Weekly individual training increases attributes that the match engine reads directly.
+- Weekly individual training increases attributes used directly by the match engine.
 - XP, levels, skill points, fans and season statistics.
 - Home-and-away league schedule and table.
-- Prototype asynchronous PvP “Ghost League”: an opponent profile contributes its player/build to an opposing 11v11 team. The current build uses local ghost profiles; real user accounts/backend are the next infrastructure layer.
+- Tactical domain layer with football phases, lanes, pressing triggers, third-man combinations, up-back-through, overlap, underlap, overload-to-isolate, wide press traps and rest-defence presets.
+- Prototype asynchronous PvP Ghost League. A ghost player/build is inserted into an opposing 11v11 team. Real account-backed PvP remains a later infrastructure layer.
+
+## Player and roster data
+
+Career Eleven separates **identity/club data** from **gameplay ratings**.
+
+- `ericsanmiguel/football_elo` (MIT) is used as a 2026 source for verified player-club relationships in the bundled refresh seed.
+- Generated squad fillers are explicitly gameplay-generated players.
+- Gameplay ratings and extended attributes are Career Eleven simulation values. They are not represented as official EA Sports / EA FC / FIFA ratings.
+- Full club-by-club 2026 roster coverage is still being expanded; the game does not claim that every generated roster is already a complete real-world roster.
+
+See `SOURCES.md` for attribution and data limitations.
 
 ## Real-money tournaments
 
-Real-money entry fees and prize payouts are **not enabled** in this build. The competitive format can be developed separately, but enabling money movement requires account infrastructure, age/identity controls, jurisdiction-specific rules, anti-fraud systems and a payment provider that supports the final product.
-
-## Data
-
-Bundled Premier League seed attributes come from `Yusufhan30/FC26-premier-league-dataset` under CC0-1.0. Public-domain / CC0 player-name pools from `openfootball/players` are used to complete larger 11v11 squads outside the bundled data pack. Generated values are explicitly career-game values, not represented as official EA/FC/FIFA ratings.
-
-See `SOURCES.md`.
+Real-money entry fees and prize payouts are **not enabled**. A production money competition layer requires account-backed authoritative results, anti-cheat and fraud controls, age/identity controls, jurisdiction-specific compliance and a payment provider that permits the final product.
 
 ## Run
 
@@ -50,4 +58,4 @@ npm run check
 npm test
 ```
 
-The test suite validates all eight league worlds, 11-player lineups, round-robin integrity, custom-player insertion, training, skills, asynchronous ghost lineups, kickoff recovery, ball control and deterministic completion of a 22-player physical match.
+The suite covers setup smoke checks, league/world creation, round-robin integrity, 11-player lineups, career progression, skills, asynchronous ghost lineups, strict free-ball physics, ballistic passes, kickoff recovery, contact/deadlock behavior and tactical playbook primitives.
