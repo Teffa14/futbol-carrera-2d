@@ -10,10 +10,10 @@ const PHYS={
   acceleration:.16,
   passPower:6.1,shotPower:7.4,
   contactSlop:.35,
-  bodyTouchTransfer:.26,
-  bodyTouchMin:.045,
-  dribbleTouchMin:.22,
-  dribbleTouchMax:1.12,
+  bodyTouchTransfer:.18,
+  bodyTouchMin:.035,
+  dribbleTouchMin:.14,
+  dribbleTouchMax:.88,
   kickCooldown:.16,
   touchCooldown:.085
 };
@@ -220,7 +220,7 @@ export class MatchEngine{
 
   dribbleTouchPower(p){
     const speed=mag(p.vx,p.vy),control=p.data.ballControl??65,dribbling=p.data.dribbling??65,error=(100-control)/100;
-    const base=.22+speed*.13+dribbling*.0022,variance=(this.rng()-.5)*error*.24;
+    const base=.14+speed*.095+dribbling*.0018,variance=(this.rng()-.5)*error*.16;
     return clamp(base+variance,PHYS.dribbleTouchMin,PHYS.dribbleTouchMax);
   }
 
@@ -230,8 +230,9 @@ export class MatchEngine{
       const dx=this.ball.x-p.x,dy=this.ball.y-p.y,d=Math.hypot(dx,dy)||.0001,min=p.r+this.ball.r;if(d>min)break;
       const normal=d>.001?{x:dx/d,y:dy/d}:{x:p.facingX,y:p.facingY},over=min-d+PHYS.contactSlop;
       this.ball.x+=normal.x*over;this.ball.y+=normal.y*over;
-      const relVx=this.ball.vx-p.vx,relVy=this.ball.vy-p.vy,closing=dot(relVx,relVy,normal.x,normal.y);
-      if(closing<0){const impulse=-closing*(1+PHYS.ballBounce);this.ball.vx+=normal.x*impulse;this.ball.vy+=normal.y*impulse;}
+
+      const ballIntoPlayer=Math.max(0,-dot(this.ball.vx,this.ball.vy,normal.x,normal.y));
+      if(ballIntoPlayer>0){const rebound=ballIntoPlayer*(1+PHYS.ballBounce*.55);this.ball.vx+=normal.x*rebound;this.ball.vy+=normal.y*rebound;}
 
       if(p.kickIntent&&p.kickCooldown<=0){
         this.executeKick(p,normal);
@@ -240,7 +241,7 @@ export class MatchEngine{
         if(p.dribbleIntent){
           const touch=this.dribbleTouchPower(p);this.ball.vx+=normal.x*touch;this.ball.vy+=normal.y*touch;p.touchCooldown=PHYS.touchCooldown;
         }else if(forward>.03){
-          const control=p.data.ballControl??65,softness=clamp(.46+(100-control)/180,.46,.82),touch=Math.max(PHYS.bodyTouchMin,forward*PHYS.bodyTouchTransfer*softness);this.ball.vx+=normal.x*touch;this.ball.vy+=normal.y*touch;p.touchCooldown=PHYS.touchCooldown*.72;
+          const control=p.data.ballControl??65,softness=clamp(.40+(100-control)/210,.40,.70),touch=Math.max(PHYS.bodyTouchMin,forward*PHYS.bodyTouchTransfer*softness);this.ball.vx+=normal.x*touch;this.ball.vy+=normal.y*touch;p.touchCooldown=PHYS.touchCooldown*.72;
         }
         if(this.tick-this.ball.lastTouchTick>1||this.ball.lastPlayerId!==p.id)this.registerPhysicalTouch(p,'touch');
       }
