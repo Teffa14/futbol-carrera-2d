@@ -44,11 +44,25 @@ test('loser of a clear physical duel keeps a short deterministic escape route in
   assert.ok(weak.contactEscapeTicks>=5,'escape should persist for several steering frames');
 });
 
+test('clear duel winner carries a short forward drive window instead of stopping after contact',()=>{
+  const strong=p('strong',0,300,95,2.8,.25),weak=p('weak',1,318,40,-1.2,0),ball={x:360,y:350,vx:1.1,vy:.2};
+  const beforeBall={...ball};
+  resolvePlayerContacts([strong,weak]);
+  assert.ok(strong.contactDriveTicks>=4,'winner should retain a brief momentum window');
+  assert.ok(strong.contactDriveX>.9,'drive should preserve the winner incoming direction');
+  assert.equal(Number(weak.contactDriveTicks)||0,0,'loser must disengage rather than receive winner drive');
+  const target=steerAroundOpponent(strong,{x:300,y:430},[strong,weak],ball);
+  assert.ok(target.x>strong.x,'winner steering should still contain meaningful forward drive after the duel');
+  assert.deepEqual(ball,beforeBall,'winner drive is player-only and must never mutate the free ball');
+});
+
 test('team-mate contact never creates competitive duel escape memory',()=>{
   const a=p('a',0,300,95,2.6,0),b=p('b',0,318,40,-1.4,0);
   resolvePlayerContacts([a,b]);
   assert.equal(Number(a.contactEscapeTicks)||0,0);
   assert.equal(Number(b.contactEscapeTicks)||0,0);
+  assert.equal(Number(a.contactDriveTicks)||0,0);
+  assert.equal(Number(b.contactDriveTicks)||0,0);
 });
 
 test('a player between opponent and ball gains physical shielding leverage',()=>{
