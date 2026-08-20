@@ -30,13 +30,16 @@ export function carryPlan(engine,p,intentTarget,dt=.016){
   let phase,moveTarget,aligned=false,nextTurnTicks=turnTicks;
   if(activeTurn){
     const rel={x:ball.x-p.x,y:ball.y-p.y},baseAhead=dot(rel.x,rel.y,turnBaseDir.x,turnBaseDir.y),sideAhead=dot(rel.x,rel.y,sideDir.x,sideDir.y);
-    const ready=actualGap<=physicalContact+7.5&&baseAhead>physicalContact*.20&&sideAhead>physicalContact*.10;
+    // movePlayer reduces touchCooldown before collision resolution. Only attack through the ball
+    // when that reduction will make the next physical contact eligible for a real dribble impulse.
+    const touchAvailable=(p.touchCooldown||0)<=dt+1e-6;
+    const ready=touchAvailable&&actualGap<=physicalContact+7.5&&baseAhead>physicalContact*.20&&sideAhead>physicalContact*.10;
     if(ready){
       aligned=true;phase='cut-touch';nextTurnTicks=turnTicks;const stride=clamp(13.5+stats.pace*.052+ballSpeed,15,21.5);moveTarget={x:ball.x+cutNormal.x*stride,y:ball.y+cutNormal.y*stride};
     }else{
       phase='turn';
-      // Do not chase several frames ahead while re-arming the cut. The player must actually
-      // gain the correct lateral side of the current ball before the next diagonal contact.
+      // Do not chase several frames ahead while re-arming the cut. During the real touch
+      // cooldown the runner uses those frames to recover the correct side of the current ball.
       const targetBall=predictedBall(ball,Math.min(lead,.8)),rear=physicalContact*.70,side=physicalContact*.52;
       moveTarget={x:targetBall.x-turnBaseDir.x*rear-sideDir.x*side,y:targetBall.y-turnBaseDir.y*rear-sideDir.y*side};
     }
@@ -57,6 +60,7 @@ function steerTurnVelocity(p,target,dt){
 
 const previousMovePlayer=MatchEngine.prototype.movePlayer;
 const previousDribbleTouchPower=MatchEngine.prototype.dribbleTouchPower;
+const previousResolveBallPlayerCollisions=MatchEngine.prototype.resolveBallPlayerCollisions;
 
 MatchEngine.prototype.movePlayer=function continuousPhysicalCarry(p,target,dt,track){
   if(!p?.dribbleIntent||p.kickIntent||!this.ball)return previousMovePlayer.call(this,p,target,dt,track);
@@ -68,9 +72,23 @@ MatchEngine.prototype.movePlayer=function continuousPhysicalCarry(p,target,dt,tr
   const result=previousMovePlayer.call(this,p,plan.moveTarget,dt,track);if(p.dribbleIntent){p.dribbleIntent.targetX=oldX;p.dribbleIntent.targetY=oldY;}return result;
 };
 
+// A setup graze can overlap the ball physically, but it is not an intentional dribble touch.
+// The base resolver consumes touchCooldown for every dribble overlap. Suppress only that zero-
+// power setup impulse for one resolver call, then restore the naturally expired cooldown so the
+// next correctly positioned cut can fire. Ball overlap/rebound physics still execute normally.
+MatchEngine.prototype.resolveBallPlayerCollisions=function carryAwareBallCollisionResolution(){
+  const suppressed=[];
+  for(const p of this.players||[]){
+    if(p?.dribbleIntent&&p?.carryState?.phase==='turn'&&(p.touchCooldown||0)<=0){suppressed.push(p);p.touchCooldown=Number.EPSILON;}
+  }
+  const result=previousResolveBallPlayerCollisions.call(this);
+  for(const p of suppressed){if(p.touchCooldown===Number.EPSILON)p.touchCooldown=0;}
+  return result;
+};
+
 MatchEngine.prototype.dribbleTouchPower=function continuousCarryTouch(p){
   const base=previousDribbleTouchPower.call(this,p),state=p?.carryState;
-  if(state?.phase==='turn')return Math.min(base,.03);
+  if(state?.phase==='turn')return 0;
   if(state?.phase==='cut-touch'){const stats=carryStats(p),speed=mag(p.vx||0,p.vy||0);return clamp(.29+speed*.125+(stats.control+stats.dribbling)*.00135,.32,.66);}
   if(state?.phase!=='touch')return base;
   const stats=carryStats(p),speed=mag(p.vx||0,p.vy||0),target=.16+speed*.105+(stats.control+stats.dribbling)*.00135;return clamp(Math.max(base*.82,target),.13,.62);
