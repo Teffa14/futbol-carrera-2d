@@ -64,7 +64,14 @@ export function armIntentPass(engine,p,option){
 
 function shotOpportunity(engine,p){
   const goalX=p.team===0?FIELD.right:FIELD.left,goalDistance=Math.abs(goalX-p.x),progress=attackProgress(p),shooting=Number(p.data.shooting??55),composure=Number(p.data.composure??65),pressure=clamp((55-nearestOpponent(engine,p).distance)/55,0,1),central=1-clamp(Math.abs(p.y-FIELD.centerY)/260,0,1);
-  return{score:progress*.40+shooting/100*.28+composure/100*.13+central*.18-pressure*.20-(goalDistance>340?.16:0),goalDistance};
+  return{score:progress*.40+shooting/100*.28+composure/100*.13+central*.18-pressure*.20-(goalDistance>340?.16:0),goalDistance,progress,central,pressure,shooting};
+}
+function shouldShoot(p,shot,bestPass){
+  const fam=roleFamily(p.role),attacker=fam==='FWD'||p.role==='CAM',midfielder=fam==='MID',threshold=attacker?.52:midfielder?.58:.67;
+  const finalThird=shot.progress>.64&&shot.goalDistance<375,goodBoxWindow=shot.progress>.76&&shot.goalDistance<255,passDominates=(bestPass?.score??-1)>shot.score+.22;
+  if(goodBoxWindow&&shot.shooting>=48&&shot.score>.46)return true;
+  if(finalThird&&shot.score>threshold&&!passDominates)return true;
+  return false;
 }
 function clearForwardSpace(engine,p){const dir=p.team===0?1:-1;let nearest=160;for(const o of engine.players){if(o.team===p.team)continue;const dx=(o.x-p.x)*dir;if(dx<0||dx>110||Math.abs(o.y-p.y)>55)continue;nearest=Math.min(nearest,dist(p,o));}return nearest;}
 function startIndependentDribble(engine,p,defender){
@@ -87,11 +94,11 @@ MatchEngine.prototype.prepareBallAction=function footballDecision(p){
   if(!p)return originalPrepare.call(this,p);if(p.boundaryPlay||p.wallPlay)return originalPrepare.call(this,p);if(p.decisionCooldown>0||p.kickIntent||p.dribbleIntent)return false;
   const contact=(p.r||7.25)+(this.ball.r||4.35)+7;if(dist(p,this.ball)>contact)return false;if(edgeBank(this,p))return true;
   const near=nearestOpponent(this,p),pressure=clamp((70-near.distance)/70,0,1),shot=shotOpportunity(this,p),passes=evaluatePassOptions(this,p),best=passes[0],fam=roleFamily(p.role),dribbling=Number(p.data.dribbling??60),control=Number(p.data.ballControl??60),vision=Number(p.data.vision??p.data.passing??60),forwardSpace=clearForwardSpace(this,p);
-  if(shot.score>.66&&shot.goalDistance<360){this.armShot(p,shot.goalDistance);p.decisionCooldown=.38;return true;}
+  if(shouldShoot(p,shot,best)){this.armShot(p,shot.goalDistance);p.decisionCooldown=.38;return true;}
   const passPreference=(fam==='MID'?.16:fam==='DEF'?.20:.04)+(vision-60)/260+pressure*.18,dribbleScore=.25+dribbling/180+control/340+forwardSpace/420-pressure*.20+(fam==='FWD'?.08:0);
   if(best&&(best.score+passPreference>.46||pressure>.46||fam==='DEF'||(fam==='MID'&&best.score>.12)))return armIntentPass(this,p,best);
   if(dribbling>=58&&forwardSpace>38&&dribbleScore>(best?.score??-.2)+.10)return startIndependentDribble(this,p,near.player);
   if(best)return armIntentPass(this,p,best);return startIndependentDribble(this,p,near.player);
 };
 
-export const __passingTest={passKindFor,passAim,clearForwardSpace,shotOpportunity};
+export const __passingTest={passKindFor,passAim,clearForwardSpace,shotOpportunity,shouldShoot};
