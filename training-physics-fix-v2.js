@@ -59,7 +59,7 @@ TrainingEngine.prototype.scenario=function physicalCrossScenario(dt){
   }
 
   // Track the actual movement produced by this repetition for regression tests.
-  this.metrics.maxPlayerTravel=Math.max(this.metrics.maxPlayerTravel,dist(this.player,this.repOrigin));
+  this.metrics.maxPlayerTravel=Math.max(this.metrics.maxPlayerTravel,dist(this.player,{x:this.repOrigin.px,y:this.repOrigin.py}));
   this.metrics.maxBallTravel=Math.max(this.metrics.maxBallTravel,dist(this.ball,{x:this.repOrigin.bx,y:this.repOrigin.by}));
 };
 
