@@ -24,10 +24,10 @@ function candidateRoleFit(p,y){const offset=Math.abs(y-FIELD.centerY),fam=roleFa
 function spaceArrivalAdvantage(engine,p,target){const profile=p.motion||motionProfile(p),ours=estimateArrivalFrames(p,target,profile),opps=engine.players.filter(o=>o.team!==p.team&&o.role!=='GK');let enemy=Infinity;for(const o of opps)enemy=Math.min(enemy,estimateArrivalFrames(o,target,o.motion||motionProfile(o)));return clamp((enemy-ours)/18,-1.2,1.8);}
 
 export function bestAttackingSpace(engine,p,actor=null){
-  const dir=attackDir(p.team),limit=onsideLimit(engine,p.team),profile=roleFamily(p.role),forwardSteps=profile==='FWD'?[70,120,175,225]:profile==='MID'?[55,100,150]:[42,78],lateralSteps=[-165,-105,-55,0,55,105,165],mates=engine.players.filter(m=>m.team===p.team&&m.id!==p.id),opps=engine.players.filter(o=>o.team!==p.team);let best=null;
+  const dir=attackDir(p.team),limit=onsideLimit(engine,p.team),profile=roleFamily(p.role),forwardSteps=profile==='FWD'?[105,155,205,245]:profile==='MID'?[55,100,150]:[42,78],lateralSteps=[-165,-105,-55,0,55,105,165],mates=engine.players.filter(m=>m.team===p.team&&m.id!==p.id),opps=engine.players.filter(o=>o.team!==p.team);let best=null;
   for(const f of forwardSteps)for(const l of lateralSteps){let x=engine.ball.x+dir*f,y=engine.ball.y+l;if(profile==='FWD'){if(dir>0)x=Math.min(x,limit-7);else x=Math.max(x,limit+7);}const t=clampTarget(p,{x,y}),arrival=spaceArrivalAdvantage(engine,p,t),nearestOpp=Math.min(...opps.map(o=>dist(o,t)),190),nearestMate=Math.min(...mates.map(m=>dist(m,t)),190),forward=dir*(t.x-engine.ball.x),actorGap=actor?dist(actor,t):120;
     let score=arrival*.58+clamp(nearestOpp/120,0,1)*.34+clamp(nearestMate/105,0,1)*.22+clamp(forward/190,-.3,1)*.27+candidateRoleFit(p,t.y)+clamp(actorGap/130,0,1)*.09-dist(p,t)/1250;
-    if(profile==='DEF'&&forward>95)score-=.24;if(profile==='FWD'&&forward<45)score-=.18;if(!best||score>best.score)best={...t,score,arrivalAdvantage:arrival};}
+    if(profile==='DEF'&&forward>95)score-=.24;if(profile==='FWD'&&forward<85)score-=.32;if(!best||score>best.score)best={...t,score,arrivalAdvantage:arrival};}
   return best||clampTarget(p,{x:p.x,y:p.y});
 }
 
