@@ -17,7 +17,7 @@
       const raw=localStorage.getItem(key);
       if(raw){
         const save=JSON.parse(raw);
-        const clubCount=save?.world?Object.keys(save.world).length:0;
+        const clubCount=save?.world?Object.keys.keys(save.world).length:0;
         if(clubCount>0&&clubCount<=6)localStorage.removeItem(key);
       }
     } catch {}
@@ -43,9 +43,12 @@
     import './match-substitutions-v1.js';
     import './match-tactical-state-v1.js';
     import './combination-play-v1.js';
+    import './match-evaluation-v2.js';
+    import './decision-value-v1.js';
     import './app.js';
     import './career-experience-ui-v1.js';
     import './training-intelligence-v7.js';
+    import './training-small-sided-v8.js';
     import './training-live-ui-v4.js';
   </script>
 </body>
