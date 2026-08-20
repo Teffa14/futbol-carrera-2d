@@ -7,26 +7,26 @@ import {fileURLToPath} from 'node:url';
 const testsDir=path.dirname(fileURLToPath(import.meta.url));
 const root=path.resolve(testsDir,'..');
 const dist=path.join(root,'dist');
+const html=()=>fs.readFileSync(path.join(dist,'index.html'),'utf8');
 
-const read=name=>fs.readFileSync(path.join(dist,name),'utf8');
-
-test('production artifact contains local application assets',()=>{
-  for(const name of ['index.html','app.js','styles.css','character-creation.css','data.js','engine.js','career.js']){
-    assert.ok(fs.existsSync(path.join(dist,name)),`${name} must be present in dist/`);
-  }
+test('production artifact is one self-contained HTML file',()=>{
+  assert.ok(fs.existsSync(path.join(dist,'index.html')),'dist/index.html must exist');
+  assert.deepEqual(fs.readdirSync(dist).sort(),['index.html']);
+  assert.match(html(),/<meta name="career-build" content="self-contained">/);
 });
 
-test('production entrypoint loads local modules instead of a GitHub runtime loader',()=>{
-  const index=read('index.html');
-  assert.match(index,/import\s+['"]\.\/app\.js['"]/);
-  assert.doesNotMatch(index,/raw\.githubusercontent\.com/);
-  assert.doesNotMatch(index,/createObjectURL\s*\(\s*new Blob/);
+test('production page embeds styles and executable game code',()=>{
+  const source=html();
+  assert.match(source,/<style>[\s\S]+<\/style>/);
+  assert.match(source,/<script>[\s\S]+<\/script>/);
+  assert.match(source,/CAREER ELEVEN|Career Eleven/);
+  assert.doesNotMatch(source,/type=["']module["']/i);
 });
 
-test('production artifact preserves relative module graph',()=>{
-  const app=read('app.js');
-  assert.match(app,/from\s+['"]\.\/engine\.js['"]/);
-  assert.match(app,/from\s+['"]\.\/career\.js['"]/);
-  assert.ok(fs.existsSync(path.join(dist,'engine.js')));
-  assert.ok(fs.existsSync(path.join(dist,'career.js')));
+test('production page has no runtime GitHub module loader or missing core asset dependency',()=>{
+  const source=html();
+  assert.doesNotMatch(source,/raw\.githubusercontent\.com/);
+  assert.doesNotMatch(source,/createObjectURL\s*\(\s*new Blob/);
+  assert.doesNotMatch(source,/(?:src|href)=["']\.\/(?:app|styles|character-creation)\./i);
+  assert.doesNotMatch(source,/from\s+['"]\.\//);
 });

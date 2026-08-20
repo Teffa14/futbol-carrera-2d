@@ -1,31 +1,50 @@
-import {cp, mkdir, readdir, readFile, rm, stat} from 'node:fs/promises';
+import {mkdir, readFile, rm, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {build} from 'esbuild';
 
 const scriptsDir=path.dirname(fileURLToPath(import.meta.url));
 const root=path.resolve(scriptsDir,'..');
 const out=path.join(root,'dist');
-const publishable=/\.(?:html|css|js)$/i;
-const required=['index.html','app.js','styles.css','character-creation.css','data.js','engine.js','career.js'];
+const sourceIndex=await readFile(path.join(root,'index.html'),'utf8');
+const moduleMatch=sourceIndex.match(/<script\s+type=["']module["']\s*>([\s\S]*?)<\/script>/i);
+if(!moduleMatch)throw new Error('index.html is missing its module entrypoint');
+if(sourceIndex.includes('raw.githubusercontent.com'))throw new Error('Source index must not use a GitHub runtime loader');
+
+const result=await build({
+  stdin:{
+    contents:moduleMatch[1],
+    resolveDir:root,
+    sourcefile:'production-entry.js',
+    loader:'js'
+  },
+  bundle:true,
+  format:'iife',
+  platform:'browser',
+  target:['es2022'],
+  minify:true,
+  write:false,
+  legalComments:'none'
+});
+
+const bundle=result.outputFiles?.[0]?.text;
+if(!bundle)throw new Error('esbuild did not produce a browser bundle');
+const baseCss=await readFile(path.join(root,'styles.css'),'utf8');
+const creationCss=await readFile(path.join(root,'character-creation.css'),'utf8');
+const safeCss=`${baseCss}\n${creationCss}`.replace(/<\/style/gi,'<\\/style');
+const safeJs=bundle.replace(/<\/script/gi,'<\\/script');
+
+let html=sourceIndex
+  .replace(/\s*<link[^>]+href=["']\.\/styles\.css["'][^>]*>/i,'')
+  .replace(/\s*<link[^>]+href=["']\.\/character-creation\.css["'][^>]*>/i,'')
+  .replace(moduleMatch[0],`<script>${safeJs}</script>`)
+  .replace('</head>',`<meta name="career-build" content="self-contained"><style>${safeCss}</style></head>`);
+
+if(/type=["']module["']/i.test(html))throw new Error('Production page still contains an unbundled module entrypoint');
+if(/(?:src|href)=["']\.\/(?:app|styles|character-creation)\./i.test(html))throw new Error('Production page still depends on separate core assets');
+if(html.includes('raw.githubusercontent.com'))throw new Error('Production page must not fetch executable modules from GitHub');
 
 await rm(out,{recursive:true,force:true});
 await mkdir(out,{recursive:true});
-
-const entries=await readdir(root,{withFileTypes:true});
-const copied=[];
-for(const entry of entries){
-  if(!entry.isFile()||!publishable.test(entry.name))continue;
-  await cp(path.join(root,entry.name),path.join(out,entry.name));
-  copied.push(entry.name);
-}
-
-for(const name of required){
-  const info=await stat(path.join(out,name)).catch(()=>null);
-  if(!info?.isFile())throw new Error(`Static build missing required asset: ${name}`);
-}
-
-const index=await readFile(path.join(out,'index.html'),'utf8');
-if(!index.includes("import './app.js'"))throw new Error('index.html must load the local app.js entrypoint');
-if(index.includes('raw.githubusercontent.com'))throw new Error('Production index must not fetch executable modules from GitHub at runtime');
-
-console.log(`Static build ready: ${copied.length} files in dist/`);
+await writeFile(path.join(out,'index.html'),html,'utf8');
+console.log(`Self-contained production build ready: ${Buffer.byteLength(html)} bytes`);
