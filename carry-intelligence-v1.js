@@ -17,6 +17,11 @@ function facingDir(p,fallback){const d=p?.carryState?.faceDir||p?.carryState?.di
 function smoothFace(p,desired,dt){const stats=carryStats(p),current=facingDir(p,desired),delta=angle(current,desired),rate=3.1+stats.agility*.045,step=clamp(delta,-rate*dt,rate*dt),next=rotate(current,step);return unit(next.x,next.y);}
 function predictedBall(ball,frames){const f=clamp(frames,0,12),damp=.985,scale=f<=0?0:(1-Math.pow(damp,f))/(1-damp);return{x:ball.x+(ball.vx||0)*scale,y:ball.y+(ball.vy||0)*scale};}
 function catchLeadFrames(p,ball,physicalContact){const stats=carryStats(p),gap=Math.max(0,dist(p,ball)-physicalContact),ballSpeed=mag(ball.vx||0,ball.vy||0),runSpeed=2.65+stats.sprint/100*1.85,closing=Math.max(.55,runSpeed-Math.min(runSpeed-.3,ballSpeed*.78));return clamp(gap/closing,0,10);}
+function touchInterceptTarget(p,ball,physicalContact){
+  const excess=Math.max(0,dist(p,ball)-physicalContact),playerSpeed=mag(p.vx||0,p.vy||0),ballSpeed=mag(ball.vx||0,ball.vy||0),closingBudget=Math.max(.7,playerSpeed+.85-Math.min(playerSpeed-.15,ballSpeed*.70));
+  const frames=clamp(.28+excess/closingBudget,.28,1.65);
+  return predictedBall(ball,frames);
+}
 
 export function carryPlan(engine,p,intentTarget,dt=.016){
   if(!engine?.ball||!p||!intentTarget)return null;
@@ -24,9 +29,10 @@ export function carryPlan(engine,p,intentTarget,dt=.016){
   const face=smoothFace(p,raw,dt),ballSpeed=mag(ball.vx||0,ball.vy||0),lead=catchLeadFrames(p,ball,physicalContact),future=predictedBall(ball,lead);
   const rel={x:ball.x-p.x,y:ball.y-p.y},forward=dot(rel.x,rel.y,raw.x,raw.y),playerAround=actualGap>.01?unit(p.x-ball.x,p.y-ball.y):{x:-raw.x,y:-raw.y},behind={x:-raw.x,y:-raw.y},aroundError=angle(playerAround,behind),near=actualGap<=physicalContact+5.0,correctSide=Math.abs(aroundError)<.24,ballAhead=forward>physicalContact*.01;
   const aligned=near&&correctSide&&ballAhead,touchAvailable=(p.touchCooldown||0)<=dt+1e-6;
-  let moveTarget,phase;
+  let moveTarget,phase,interceptTarget=null;
   if(aligned&&touchAvailable){
     const stride=clamp(13+stats.pace*.055+ballSpeed*1.45,15,23);
+    interceptTarget=touchInterceptTarget(p,ball,physicalContact);
     moveTarget={x:ball.x+raw.x*stride,y:ball.y+raw.y*stride};phase='touch';
   }else if(aligned){
     const holdBall=predictedBall(ball,Math.min(lead,.30)),radius=physicalContact+1.45;
@@ -36,7 +42,7 @@ export function carryPlan(engine,p,intentTarget,dt=.016){
     moveTarget={x:future.x-raw.x*radius,y:future.y-raw.y*radius};phase='recover';
   }
   const facingTarget={x:ball.x+face.x*95,y:ball.y+face.y*95};
-  return{moveTarget,facingTarget,dir:face,faceDir:face,intentDir:raw,turnBaseDir:previousIntent,turnSide:Math.sign(intentDelta)||state.turnSide||1,cutNormal:null,cutContacts:0,cutStage:'none',cutStageTicks:0,cutJustHit:false,turnTicks:0,phase,aligned,activeTurn:false,intentDelta,turnSharpness:Math.abs(intentDelta),actualGap,lead,aroundError,touchAvailable};
+  return{moveTarget,interceptTarget,facingTarget,dir:face,faceDir:face,intentDir:raw,turnBaseDir:previousIntent,turnSide:Math.sign(intentDelta)||state.turnSide||1,cutNormal:null,cutContacts:0,cutStage:'none',cutStageTicks:0,cutJustHit:false,turnTicks:0,phase,aligned,activeTurn:false,intentDelta,turnSharpness:Math.abs(intentDelta),actualGap,physicalContact,lead,aroundError,touchAvailable};
 }
 
 function steerCarryVelocity(p,target,dt,mode='recover'){
@@ -52,6 +58,13 @@ function plantCarryTurn(p,target,sharpness){
   const stats=carryStats(p),current=unit(p.vx,p.vy),desired=unit(target.x-p.x,target.y-p.y),delta=angle(current,desired),step=clamp(delta,-.55,.55),next=rotate(current,step),retain=clamp(.72+stats.agility*.0018,.76,.91);
   p.vx=next.x*speed*retain;p.vy=next.y*speed*retain;
 }
+function closeCarryContact(p,ball,target){
+  if(!target)return;
+  const n=unit(target.x-p.x,target.y-p.y),relative=dot((p.vx||0)-(ball.vx||0),(p.vy||0)-(ball.vy||0),n.x,n.y),stats=carryStats(p),desired=clamp(.82+stats.pace*.0045+stats.agility*.0035,.95,1.62);
+  if(relative>=desired)return;
+  const gain=clamp((desired-relative)*.56,0,.72);
+  p.vx+=n.x*gain;p.vy+=n.y*gain;
+}
 
 const previousMovePlayer=MatchEngine.prototype.movePlayer;
 const previousDribbleTouchPower=MatchEngine.prototype.dribbleTouchPower;
@@ -64,7 +77,9 @@ MatchEngine.prototype.movePlayer=function continuousPhysicalCarry(p,target,dt,tr
   const intent=p.dribbleIntent,oldX=intent.targetX,oldY=intent.targetY;intent.targetX=plan.facingTarget.x;intent.targetY=plan.facingTarget.y;
   p.carryState={...(p.carryState||{}),dir:plan.faceDir,intentDir:plan.intentDir,faceDir:plan.faceDir,turnBaseDir:plan.turnBaseDir,turnSide:plan.turnSide,cutNormal:null,cutContacts:0,cutStage:'none',cutStageTicks:0,cutJustHit:false,turnTicks:0,phase:plan.phase,aligned:plan.aligned,aroundError:plan.aroundError,lastTick:this.tick};
   plantCarryTurn(p,plan.moveTarget,Math.abs(plan.intentDelta));
-  steerCarryVelocity(p,plan.moveTarget,dt,plan.phase);
+  const steerTarget=plan.phase==='touch'&&plan.interceptTarget?plan.interceptTarget:plan.moveTarget;
+  steerCarryVelocity(p,steerTarget,dt,plan.phase);
+  if(plan.phase==='touch')closeCarryContact(p,this.ball,plan.interceptTarget);
   const result=previousMovePlayer.call(this,p,plan.moveTarget,dt,track);if(p.dribbleIntent){p.dribbleIntent.targetX=oldX;p.dribbleIntent.targetY=oldY;}return result;
 };
 
@@ -85,4 +100,4 @@ MatchEngine.prototype.dribbleTouchPower=function continuousCarryTouch(p){
   const stats=carryStats(p),speed=mag(p.vx||0,p.vy||0),target=.16+speed*.105+(stats.control+stats.dribbling)*.00135;return clamp(Math.max(base*.82,target),.13,.62);
 };
 
-export const __carryIntelligenceV1={carryStats,intentDir,smoothFace,predictedBall,catchLeadFrames,steerCarryVelocity,plantCarryTurn};
+export const __carryIntelligenceV1={carryStats,intentDir,smoothFace,predictedBall,catchLeadFrames,touchInterceptTarget,steerCarryVelocity,plantCarryTurn,closeCarryContact};
