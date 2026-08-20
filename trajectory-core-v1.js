@@ -1,14 +1,15 @@
 export const TRAJECTORY_FIELD={left:55,right:1045,top:45,bottom:655,goalTop:295,goalBottom:405,goalDepth:46};
-export const TRAJECTORY_PHYSICS={ballDamping:.993,ballBounce:.64,gravity:.026,aerialBounce:.22};
+export const TRAJECTORY_PHYSICS={ballDamping:.993,ballBounce:.64,gravity:.026,aerialBounce:.22,spinTurn:.0068,spinDecay:.994};
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const dist=(a,b)=>Math.hypot((a?.x||0)-(b?.x||0),(a?.y||0)-(b?.y||0));
 
 export function predictBallPath(ball,options={}){
   const field=options.field||TRAJECTORY_FIELD,physics={...TRAJECTORY_PHYSICS,...(options.physics||{})},sampleEvery=Math.max(1,Math.round(options.sampleEvery||3)),horizonFrames=Math.max(sampleEvery,Math.round(options.horizonFrames||150));
-  const r=Number(ball?.r??4.35);let x=Number(ball?.x||0),y=Number(ball?.y||0),vx=Number(ball?.vx||0),vy=Number(ball?.vy||0),z=Math.max(0,Number(ball?.z||0)),vz=Number(ball?.vz||0);
-  const path=[{frame:0,x,y,z,vx,vy,vz,bounce:false}];
+  const r=Number(ball?.r??4.35);let x=Number(ball?.x||0),y=Number(ball?.y||0),vx=Number(ball?.vx||0),vy=Number(ball?.vy||0),z=Math.max(0,Number(ball?.z||0)),vz=Number(ball?.vz||0),spin=Number(ball?.spin||0);
+  const path=[{frame:0,x,y,z,vx,vy,vz,spin,bounce:false}];
   for(let frame=1;frame<=horizonFrames;frame++){
+    const speed=Math.hypot(vx,vy);if(spin&&speed>.35){const theta=spin*physics.spinTurn*clamp(speed/5,.42,1.18),c=Math.cos(theta),s=Math.sin(theta),nvx=vx*c-vy*s,nvy=vx*s+vy*c;vx=nvx;vy=nvy;spin*=physics.spinDecay;if(Math.abs(spin)<.025)spin=0;}
     vx*=physics.ballDamping;vy*=physics.ballDamping;x+=vx;y+=vy;let bounce=false;
     if(z>0||vz!==0){vz-=physics.gravity;z+=vz;if(z<=0){z=0;if(Math.abs(vz)>.18)vz=-vz*physics.aerialBounce;else vz=0;}}
     if(y-r<field.top){y=field.top+r;vy=Math.abs(vy)*physics.ballBounce;bounce=true;}
@@ -18,8 +19,8 @@ export function predictBallPath(ball,options={}){
     if(!mouth&&x+r>field.right){x=field.right-r;vx=-Math.abs(vx)*physics.ballBounce;bounce=true;}
     if(mouth&&x<field.left-field.goalDepth){x=field.left-field.goalDepth;vx=Math.abs(vx)*.45;bounce=true;}
     if(mouth&&x>field.right+field.goalDepth){x=field.right+field.goalDepth;vx=-Math.abs(vx)*.45;bounce=true;}
-    if(frame%sampleEvery===0||bounce||frame===horizonFrames)path.push({frame,x,y,z,vx,vy,vz,bounce});
-    if(Math.hypot(vx,vy)<.035&&z===0&&Math.abs(vz)<.02&&frame>24){if(path.at(-1)?.frame!==frame)path.push({frame,x,y,z,vx,vy,vz,bounce});break;}
+    if(frame%sampleEvery===0||bounce||frame===horizonFrames)path.push({frame,x,y,z,vx,vy,vz,spin,bounce});
+    if(Math.hypot(vx,vy)<.035&&z===0&&Math.abs(vz)<.02&&frame>24){if(path.at(-1)?.frame!==frame)path.push({frame,x,y,z,vx,vy,vz,spin,bounce});break;}
   }
   return path;
 }
