@@ -23,34 +23,48 @@ export function carryPlan(engine,p,intentTarget,dt=.016){
   const ball=engine.ball,state=p.carryState||{},stats=carryStats(p),raw=unit(intentTarget.x-ball.x,intentTarget.y-ball.y),previousIntent=intentDir(p,raw),intentDelta=angle(previousIntent,raw),actualGap=dist(p,ball),physicalContact=(p.r||7.25)+(ball.r||4.35),newTurn=Math.abs(intentDelta)>.28&&actualGap<34;
   const turnBaseDir=newTurn?previousIntent:(state.turnBaseDir||previousIntent),turnSide=newTurn?(Math.sign(intentDelta)||1):(state.turnSide||1),sideDir=rotate(turnBaseDir,turnSide*Math.PI/2);
   const cutNormal=unit(turnBaseDir.x*.50+sideDir.x*.87,turnBaseDir.y*.50+sideDir.y*.87);
-  const inheritedContacts=newTurn?0:(state.cutContacts||0),turnTicks=newTurn?96:Math.max(0,(state.turnTicks||0)-1),completedCuts=inheritedContacts>=2,activeTurn=!completedCuts&&turnTicks>0;
+  const inheritedContacts=newTurn?0:(state.cutContacts||0),turnTicks=newTurn?112:Math.max(0,(state.turnTicks||0)-1),completedCuts=inheritedContacts>=2,activeTurn=!completedCuts&&turnTicks>0;
   const face=smoothFace(p,raw,dt),ballSpeed=mag(ball.vx||0,ball.vy||0),lead=catchLeadFrames(p,ball,physicalContact),future=predictedBall(ball,lead);
 
-  let phase,moveTarget,aligned=false,nextTurnTicks=turnTicks,cutStage='setup';
+  let phase,moveTarget,aligned=false,nextTurnTicks=turnTicks;
+  let cutStage=newTurn?'setup':(state.cutStage||'setup');
+  let cutStageTicks=newTurn?0:(state.cutStageTicks||0);
   if(activeTurn){
     const setupRadius=physicalContact+2.8,impactRadius=Math.max(physicalContact-1.8,physicalContact*.84),touchAvailable=(p.touchCooldown||0)<=dt+1e-6;
-    if(touchAvailable){
-      // Do not wait for a perfect outside setup. The impact target is deliberately inside the
-      // collision ring. The player keeps attacking this point until the resolver confirms that
-      // a real contact occurred and increments cutContacts.
-      cutStage='strike';phase='cut-approach';aligned=true;
+
+    // One physical cut is not a permanent steering state. It is a short gait cycle:
+    // recover behind/side, attack the contact ring, then either confirm the hit or reset and retry.
+    // This prevents the old failure where the carrier spent ~90 frames chasing one stale impact point.
+    if(state.cutJustHit){cutStage='setup';cutStageTicks=0;}
+
+    if(cutStage==='setup'){
+      cutStageTicks++;
+      const minimumRecovery=5;
+      if(touchAvailable&&cutStageTicks>=minimumRecovery){cutStage='strike';cutStageTicks=0;}
+    }else{
+      cutStageTicks++;
+      if(!touchAvailable||cutStageTicks>14){cutStage='setup';cutStageTicks=0;}
+    }
+
+    if(cutStage==='strike'){
+      phase='cut-approach';aligned=true;
+      // Deliberately inside the contact ring. The player must physically cross into collision;
+      // no ball position or velocity is written here.
       moveTarget={x:ball.x-cutNormal.x*impactRadius,y:ball.y-cutNormal.y*impactRadius};
     }else{
-      // The real cooldown becomes recovery time between touches. Reposition on the same rear-side
-      // normal while the ball remains completely free, then attack again as soon as contact can fire.
-      cutStage='setup';phase='cut-setup';
+      phase='cut-setup';
       const targetBall=predictedBall(ball,Math.min(lead,.45));
       moveTarget={x:targetBall.x-cutNormal.x*setupRadius,y:targetBall.y-cutNormal.y*setupRadius};
     }
   }else{
-    nextTurnTicks=0;
+    nextTurnTicks=0;cutStage='setup';cutStageTicks=0;
     const rel={x:ball.x-p.x,y:ball.y-p.y},forward=dot(rel.x,rel.y,raw.x,raw.y),playerAround=actualGap>.01?unit(p.x-ball.x,p.y-ball.y):{x:-raw.x,y:-raw.y},behind={x:-raw.x,y:-raw.y},aroundError=angle(playerAround,behind),near=actualGap<=physicalContact+4.2,correctSide=Math.abs(aroundError)<.47,ballAhead=forward>physicalContact*.05;
     aligned=near&&correctSide&&ballAhead;
     if(aligned){const stride=clamp(13+stats.pace*.055+ballSpeed*1.45,15,23);moveTarget={x:ball.x+raw.x*stride,y:ball.y+raw.y*stride};phase='touch';}
     else{const radius=physicalContact-.9;moveTarget={x:future.x-raw.x*radius,y:future.y-raw.y*radius};phase='recover';}
   }
   const facingTarget={x:ball.x+face.x*95,y:ball.y+face.y*95};
-  return{moveTarget,facingTarget,dir:face,faceDir:face,intentDir:raw,turnBaseDir,turnSide,cutNormal,cutContacts:inheritedContacts,cutStage,cutJustHit:false,turnTicks:nextTurnTicks,phase,aligned,activeTurn,intentDelta,turnSharpness:Math.abs(intentDelta),actualGap,lead};
+  return{moveTarget,facingTarget,dir:face,faceDir:face,intentDir:raw,turnBaseDir,turnSide,cutNormal,cutContacts:inheritedContacts,cutStage,cutStageTicks,cutJustHit:false,turnTicks:nextTurnTicks,phase,aligned,activeTurn,intentDelta,turnSharpness:Math.abs(intentDelta),actualGap,lead};
 }
 
 function steerTurnVelocity(p,target,dt){
@@ -67,7 +81,7 @@ MatchEngine.prototype.movePlayer=function continuousPhysicalCarry(p,target,dt,tr
   const intended={x:p.dribbleIntent.targetX,y:p.dribbleIntent.targetY};if(!Number.isFinite(intended.x)||!Number.isFinite(intended.y))return previousMovePlayer.call(this,p,target,dt,track);
   const plan=carryPlan(this,p,intended,dt);if(!plan)return previousMovePlayer.call(this,p,target,dt,track);
   const intent=p.dribbleIntent,oldX=intent.targetX,oldY=intent.targetY;intent.targetX=plan.facingTarget.x;intent.targetY=plan.facingTarget.y;
-  p.carryState={...(p.carryState||{}),dir:plan.faceDir,intentDir:plan.intentDir,faceDir:plan.faceDir,turnBaseDir:plan.turnBaseDir,turnSide:plan.turnSide,cutNormal:plan.cutNormal,cutContacts:plan.cutContacts,cutStage:plan.cutStage,cutJustHit:plan.cutJustHit,turnTicks:plan.turnTicks,phase:plan.phase,aligned:plan.aligned,lastTick:this.tick};
+  p.carryState={...(p.carryState||{}),dir:plan.faceDir,intentDir:plan.intentDir,faceDir:plan.faceDir,turnBaseDir:plan.turnBaseDir,turnSide:plan.turnSide,cutNormal:plan.cutNormal,cutContacts:plan.cutContacts,cutStage:plan.cutStage,cutStageTicks:plan.cutStageTicks,cutJustHit:plan.cutJustHit,turnTicks:plan.turnTicks,phase:plan.phase,aligned:plan.aligned,lastTick:this.tick};
   if(plan.phase==='cut-setup'||plan.phase==='cut-approach')steerTurnVelocity(p,plan.moveTarget,dt);
   const result=previousMovePlayer.call(this,p,plan.moveTarget,dt,track);if(p.dribbleIntent){p.dribbleIntent.targetX=oldX;p.dribbleIntent.targetY=oldY;}return result;
 };
@@ -82,7 +96,7 @@ MatchEngine.prototype.resolveBallPlayerCollisions=function carryAwareBallCollisi
   const result=previousResolveBallPlayerCollisions.call(this);
   for(const p of suppressed){if(p.touchCooldown===Number.EPSILON)p.touchCooldown=0;}
   for(const [p,before] of strikeBefore){
-    if((p.touchCooldown||0)>before+.04){p.carryState={...(p.carryState||{}),cutContacts:(p.carryState?.cutContacts||0)+1,cutStage:'setup',cutJustHit:true,phase:'cut-hit'};}
+    if((p.touchCooldown||0)>before+.04){p.carryState={...(p.carryState||{}),cutContacts:(p.carryState?.cutContacts||0)+1,cutStage:'setup',cutStageTicks:0,cutJustHit:true,phase:'cut-hit'};}
   }
   return result;
 };
