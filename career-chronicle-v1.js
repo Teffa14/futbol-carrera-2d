@@ -45,6 +45,7 @@ export function syncCareerChronicle(state){
     goals+=Number(entry?.goals)||0;
     assists+=Number(entry?.assists)||0;
     const totals={apps,goals,assists};
+
     if(entry?.appeared)addMilestone(state,CAREER_MILESTONE_TYPES.debut,entry,totals);
     if(entry?.appeared&&entry?.squadStatus==='starter')addMilestone(state,CAREER_MILESTONE_TYPES.firstStart,entry,totals);
     if((Number(entry?.goals)||0)>0)addMilestone(state,CAREER_MILESTONE_TYPES.firstGoal,entry,totals);
@@ -56,5 +57,11 @@ export function syncCareerChronicle(state){
   return chronicle;
 }
 
-export function careerMilestone(state,type){return syncCareerChronicle(state).milestones.find(m=>m.type===type)||null;}
-export function recentCareerMilestones(state,limit=5){const n=Math.max(0,Math.floor(Number(limit)||0));return syncCareerChronicle(state).milestones.slice(-n).reverse();}
+export function careerMilestone(state,type){
+  return syncCareerChronicle(state).milestones.find(m=>m.type===type)||null;
+}
+
+export function recentCareerMilestones(state,limit=5){
+  const n=Math.max(0,Math.floor(Number(limit)||0));
+  return syncCareerChronicle(state).milestones.slice(-n).reverse();
+}
