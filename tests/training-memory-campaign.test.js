@@ -25,7 +25,9 @@ test('training preview is deterministic for the same career week and drill',()=>
 });
 
 test('visible training engine completes a drill and moves player and ball through the exercise',()=>{
-  const s=state(),drill=DRILLS.find(d=>d.id==='crossing'),result={drillId:drill.id,quality:80,grade:'A',reps:8,successes:6,seed:'visual'},e=new TrainingEngine(drill,result,s.player),start={x:e.player.x,y:e.player.y,bx:e.ball.x,by:e.ball.y};for(let i=0;i<2000&&!e.finished;i++)e.step(.016);assert.equal(e.finished,true);assert.ok(Math.hypot(e.player.x-start.x,e.player.y-start.y)>80);assert.ok(Math.hypot(e.ball.x-start.bx,e.ball.y-start.by)>80);
+  const s=state(),drill=DRILLS.find(d=>d.id==='crossing'),result={drillId:drill.id,quality:80,grade:'A',reps:8,successes:6,seed:'visual'},e=new TrainingEngine(drill,result,s.player);
+  for(let i=0;i<3000&&!e.finished;i++)e.step(.016);
+  assert.equal(e.finished,true);assert.ok(e.metrics.maxPlayerTravel>80,`player only travelled ${e.metrics.maxPlayerTravel}`);assert.ok(e.metrics.maxBallTravel>80,`ball only travelled ${e.metrics.maxBallTravel}`);assert.ok(e.metrics.kicks>0,'crossing drill must contain a physical kick');assert.ok(e.metrics.repResets>=result.reps-1,'repeated drill should reset between reps');
 });
 
 test('career interaction changes coach/locker-room state and can teach football memory',()=>{
