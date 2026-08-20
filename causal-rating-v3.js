@@ -7,7 +7,6 @@ import {__evaluationV2} from './match-evaluation-v2.js';
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const dist=(a,b)=>Math.hypot((a?.x??0)-(b?.x??0),(a?.y??0)-(b?.y??0));
 const add=(engine,p,cat,value,label,key='',cooldown=0)=>__evaluationV2.add(engine,p,cat,value,label,key,cooldown);
-function attackDir(team){return team===0?1:-1;}
 function progress(team,x){return team===0?(x-FIELD.left)/(FIELD.right-FIELD.left):(FIELD.right-x)/(FIELD.right-FIELD.left);}
 
 export function shotQuality(engine,p,start={x:p?.x??FIELD.centerX,y:p?.y??FIELD.centerY}){
@@ -17,7 +16,7 @@ export function shotQuality(engine,p,start={x:p?.x??FIELD.centerX,y:p?.y??FIELD.
 
 export function spaceContribution(engine,p,actor=null){
   if(!p||p.role==='GK'||!actor||actor.team!==p.team||actor.id===p.id)return{value:0,option:null,space:null};
-  const options=chemistryAdjustedPassOptions(engine,actor),option=options.find(o=>o.player.id===p.id)||null,space=bestAttackingSpace(engine,p,actor),near=space?clamp(1-dist(p,space)/115,0,1):0,passSignal=option?clamp((option.adjustedScore+.05)/.72,0,1):0,arrival=space?clamp((space.arrivalAdvantage+.35)/1.7,0,1):0,runKind=p.spaceRun?.kind||'',runBonus=runKind==='pass-and-run'||runKind==='attack-cross-trajectory'?.18:runKind==='occupy-space'?.08:0;
+  const options=chemistryAdjustedPassOptions(engine,actor),option=options.find(o=>o.player.id===p.id)||null,space=bestAttackingSpace(engine,p,actor),near=space?clamp(1-dist(p,space)/115,0,1):0,passSignal=option?clamp((option.adjustedScore+.05)/.72,0,1):0,arrival=space?clamp((space.arrivalAdvantage+.35)/1.7,0,1):0,runKind=p.spaceRun?.kind||'';let runBonus=0;if(runKind==='pass-and-run'||runKind==='attack-cross-trajectory')runBonus=.18;else if(runKind==='occupy-space')runBonus=.08;
   return{value:clamp(near*.30+passSignal*.39+arrival*.23+runBonus,0,1),option,space};
 }
 
@@ -39,10 +38,10 @@ MatchEngine.prototype.executeKick=function causalShotChoice(p,contactNormal){
 
 const previousTouch=MatchEngine.prototype.registerPhysicalTouch;
 MatchEngine.prototype.registerPhysicalTouch=function causalPassAndShotTouch(p,type='touch'){
-  const ep=this.ball?.evaluationPass?{...this.ball.evaluationPass}:null,shot=this.ball?.causalShot?{...this.ball.causalShot}:null,previousTeam=this.ball?.lastTeam,result=previousTouch.call(this,p,type);
+  const ep=this.ball?.evaluationPass?{...this.ball.evaluationPass}:null,shot=this.ball?.causalShot?{...this.ball.causalShot}:null,result=previousTouch.call(this,p,type);
   if(ep&&ep.receiverId===p?.id){const passer=this.playerById(ep.passerId);if(passer?.team===p.team){const gain=Math.max(0,Number(ep.value)||0),bonus=.012+gain*.16;add(this,passer,'passing',bonus,gain>.14?'Pase que rompe y mejora la jugada':gain>.06?'Pase progresivo útil':'Pase útil',`causal-pass-${ep.tick}`,1);}}
   if(shot&&p?.team!==this.playerById(shot.shooterId)?.team){const shooter=this.playerById(shot.shooterId);if(shooter&&p.role==='GK')add(this,shooter,'shooting',.025+shot.quality*.075,'Remate que obliga a atajar',`forced-save-${shot.tick}`,1);this.ball.causalShot=null;}
-  if(previousTeam!==null&&p&&this.ball?.causalShot&&this.tick-this.ball.causalShot.tick>85)this.ball.causalShot=null;
+  if(p&&this.ball?.causalShot&&this.tick-this.ball.causalShot.tick>85)this.ball.causalShot=null;
   return result;
 };
 
