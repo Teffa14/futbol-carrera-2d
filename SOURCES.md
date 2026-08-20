@@ -6,15 +6,23 @@
 - Repository: https://github.com/dcaribou/transfermarkt-datasets
 - License: CC0 1.0 Universal / public domain.
 - Refresh endpoint: the project publishes compressed CSV assets from its weekly pipeline.
-- Use: current player-to-club identity, birth date, position/sub-position, nationality and market-value context.
+- Use: current player-to-club identity, birth date, position/sub-position, nationality and market-value context for competitions covered by that dataset.
 - `scripts/refresh-live-rosters.mjs` checks this source automatically and never trusts an old bundled club assignment when a newer current-club row exists.
+
+### Sofascore public web data — Argentina second division fallback
+- Tournament: Primera Nacional / unique tournament 703.
+- Use: discover the active 2026 season, read the current 36-team standings, then read each active team roster from the same public JSON endpoints used by the web experience.
+- No API key or paid subscription is required by Career Eleven.
+- This is a secondary roster source specifically because the CC0 Transfermarkt dataset does not guarantee coverage of every Argentine second-tier club.
+- Current season ratings are used only as a fallback signal when a player cannot be matched to the attribute dataset.
+- The refresh job uses conservative request volume and fails closed if second-division coverage drops below the quality threshold.
 
 ### EAFC26-DataHub / public FC26 attribute dataset
 - Repository: https://github.com/ismailoksuz/EAFC26-DataHub
 - Upstream dataset: `rovnez/fc-26-fifa-26-player-data`.
 - Use: pace, shooting, passing, dribbling, defending, physical, overall and age when a player identity can be matched safely.
-- Club ownership is never taken from this ratings dataset. Current-club identity comes from the live roster source above.
-- When no attribute match exists, Career Eleven derives conservative gameplay attributes from public identity/position/market-value context and labels the row as derived gameplay data.
+- Club ownership is never taken from this ratings dataset. Current-club identity comes from the live roster sources above.
+- When no attribute match exists, Career Eleven derives conservative gameplay attributes from current position plus live season-rating or role/market-value context and marks the row as derived gameplay data.
 
 ### ericsanmiguel/football_elo
 - Repository: https://github.com/ericsanmiguel/football_elo
@@ -37,7 +45,9 @@
 
 ## Automatic refresh policy
 
-`.github/workflows/refresh-rosters.yml` runs daily and on relevant pipeline changes. It rebuilds `live-rosters.generated.js` only from free sources and commits a new snapshot when data changes. The browser never needs an API key and never performs live scraping during gameplay.
+`.github/workflows/refresh-rosters.yml` runs daily and on relevant pipeline changes. Pull requests execute the same refresh as a live quality check. A snapshot is rejected if the second division contains fewer than 450 resolved players or fewer than 30 clubs with at least 11 resolved players.
+
+The workflow rebuilds `live-rosters.generated.js` only from free sources and commits a new snapshot when data changes. The browser never needs an API key and never performs roster scraping during gameplay.
 
 Player identity and gameplay attributes are intentionally separated. A transfer can therefore move a player to a new club without waiting for a new ratings release.
 
@@ -57,4 +67,4 @@ HaxBall is not the product name and no HaxBall source code, assets or stadium fi
 
 ## Builds and skills
 
-Career builds and skills are original gameplay abstractions based on common football concepts. No proprietary EA Sports / FIFA / EA FC code, artwork, UI or protected gameplay data is copied.
+Career builds and skills are original gameplay abstractions based on common football concepts. No proprietary EA Sports / FIFA / EA FC code, artwork or protected gameplay code is copied.
