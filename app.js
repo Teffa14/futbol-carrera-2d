@@ -4,7 +4,7 @@ import {createCareer,loadCareer,saveCareer,clearCareer,clubById,countryById,buil
 
 const app=document.querySelector('#app');
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
-const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let state=loadCareer(),view='home',live=null,raf=null,lastTs=0;
 let setup={step:1,playerName:'',nationality:'AR',position:'CM',build:'creator',countryId:'AR',clubId:null};
 
