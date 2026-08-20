@@ -15,6 +15,7 @@ function carryStats(p){
 function intentDir(p,fallback){const d=p?.carryState?.intentDir||p?.carryState?.dir;return d&&Number.isFinite(d.x)&&Number.isFinite(d.y)?unit(d.x,d.y):fallback;}
 function facingDir(p,fallback){const d=p?.carryState?.faceDir||p?.carryState?.dir;return d&&Number.isFinite(d.x)&&Number.isFinite(d.y)?unit(d.x,d.y):unit(p?.facingX??fallback.x,p?.facingY??fallback.y);}
 function savedTurnDir(state,fallback){const d=state?.turnDir;return d&&Number.isFinite(d.x)&&Number.isFinite(d.y)?unit(d.x,d.y):fallback;}
+function advanceTurnDir(current,desired,maxStep=.13){const a=unit(current.x,current.y),b=unit(desired.x,desired.y),delta=angle(a,b),next=rotate(a,clamp(delta,-maxStep,maxStep));return unit(next.x,next.y);}
 function smoothFace(p,desired,dt){const stats=carryStats(p),current=facingDir(p,desired),delta=angle(current,desired),rate=3.1+stats.agility*.045,step=clamp(delta,-rate*dt,rate*dt),next=rotate(current,step);return unit(next.x,next.y);}
 function predictedBall(ball,frames){const f=clamp(frames,0,12),damp=.985,scale=f<=0?0:(1-Math.pow(damp,f))/(1-damp);return{x:ball.x+(ball.vx||0)*scale,y:ball.y+(ball.vy||0)*scale};}
 function catchLeadFrames(p,ball,physicalContact){const stats=carryStats(p),gap=Math.max(0,dist(p,ball)-physicalContact),ballSpeed=mag(ball.vx||0,ball.vy||0),runSpeed=2.65+stats.sprint/100*1.85,closing=Math.max(.55,runSpeed-Math.min(runSpeed-.3,ballSpeed*.78));return clamp(gap/closing,0,10);}
@@ -86,6 +87,7 @@ MatchEngine.prototype.resolveBallPlayerCollisions=function alignedCarryCollision
     const p=watch.p;
     if(watch.before<=1e-6&&(p.touchCooldown||0)>.04&&p.carryState){
       p.carryState.turnTouches=Number(p.carryState.turnTouches||0)+1;
+      if(p.carryState.turnDir&&p.carryState.intentDir)p.carryState.turnDir=advanceTurnDir(p.carryState.turnDir,p.carryState.intentDir,.13);
       if(p.carryState.turnTouches>=5){p.carryState.turnAssistTicks=0;p.carryState.turnAssist=false;p.carryState.turnDir=null;}
     }
   }
@@ -104,4 +106,4 @@ MatchEngine.prototype.dribbleTouchPower=function continuousCarryTouch(p){
   return clamp(Math.max(base*.82,target),.13,.62);
 };
 
-export const __carryIntelligenceV1={carryStats,intentDir,smoothFace,predictedBall,catchLeadFrames,touchInterceptTarget,orbitRecoveryTarget,steerCarryVelocity,plantCarryTurn,closeTurnContact,closeTurnRecovery};
+export const __carryIntelligenceV1={carryStats,intentDir,advanceTurnDir,smoothFace,predictedBall,catchLeadFrames,touchInterceptTarget,orbitRecoveryTarget,steerCarryVelocity,plantCarryTurn,closeTurnContact,closeTurnRecovery};
