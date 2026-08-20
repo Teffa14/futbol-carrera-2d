@@ -22,24 +22,18 @@ export function carryPlan(engine,p,intentTarget,dt=.016){
   if(!engine?.ball||!p||!intentTarget)return null;
   const ball=engine.ball,state=p.carryState||{},stats=carryStats(p),raw=unit(intentTarget.x-ball.x,intentTarget.y-ball.y),previousIntent=intentDir(p,raw),intentDelta=angle(previousIntent,raw),actualGap=dist(p,ball),physicalContact=(p.r||7.25)+(ball.r||4.35);
   const face=smoothFace(p,raw,dt),ballSpeed=mag(ball.vx||0,ball.vy||0),lead=catchLeadFrames(p,ball,physicalContact),future=predictedBall(ball,lead);
-  const rel={x:ball.x-p.x,y:ball.y-p.y},forward=dot(rel.x,rel.y,raw.x,raw.y),playerAround=actualGap>.01?unit(p.x-ball.x,p.y-ball.y):{x:-raw.x,y:-raw.y},behind={x:-raw.x,y:-raw.y},aroundError=angle(playerAround,behind),near=actualGap<=physicalContact+5.4,correctSide=Math.abs(aroundError)<.60,ballAhead=forward>physicalContact*.01;
+  const rel={x:ball.x-p.x,y:ball.y-p.y},forward=dot(rel.x,rel.y,raw.x,raw.y),playerAround=actualGap>.01?unit(p.x-ball.x,p.y-ball.y):{x:-raw.x,y:-raw.y},behind={x:-raw.x,y:-raw.y},aroundError=angle(playerAround,behind),near=actualGap<=physicalContact+5.0,correctSide=Math.abs(aroundError)<.24,ballAhead=forward>physicalContact*.01;
   const aligned=near&&correctSide&&ballAhead,touchAvailable=(p.touchCooldown||0)<=dt+1e-6;
   let moveTarget,phase;
   if(aligned&&touchAvailable){
     const stride=clamp(13+stats.pace*.055+ballSpeed*1.45,15,23);
-    moveTarget={x:ball.x+raw.x*stride,y:ball.y+raw.y*stride};
-    phase='touch';
+    moveTarget={x:ball.x+raw.x*stride,y:ball.y+raw.y*stride};phase='touch';
   }else if(aligned){
-    // A dribble impulse has a short physical cooldown. Do not run through the free ball while an
-    // impact cannot register; stay just outside the rear contact ring and prepare the next stride.
-    const holdBall=predictedBall(ball,Math.min(lead,.35)),radius=physicalContact+1.35;
-    moveTarget={x:holdBall.x-raw.x*radius,y:holdBall.y-raw.y*radius};
-    phase='ready';
+    const holdBall=predictedBall(ball,Math.min(lead,.30)),radius=physicalContact+1.45;
+    moveTarget={x:holdBall.x-raw.x*radius,y:holdBall.y-raw.y*radius};phase='ready';
   }else{
-    // Recovery also stays outside the collision ring so the next registered touch is intentional.
-    const radius=physicalContact+2.2;
-    moveTarget={x:future.x-raw.x*radius,y:future.y-raw.y*radius};
-    phase='recover';
+    const radius=physicalContact+2.6;
+    moveTarget={x:future.x-raw.x*radius,y:future.y-raw.y*radius};phase='recover';
   }
   const facingTarget={x:ball.x+face.x*95,y:ball.y+face.y*95};
   return{moveTarget,facingTarget,dir:face,faceDir:face,intentDir:raw,turnBaseDir:previousIntent,turnSide:Math.sign(intentDelta)||state.turnSide||1,cutNormal:null,cutContacts:0,cutStage:'none',cutStageTicks:0,cutJustHit:false,turnTicks:0,phase,aligned,activeTurn:false,intentDelta,turnSharpness:Math.abs(intentDelta),actualGap,lead,aroundError,touchAvailable};
@@ -48,13 +42,20 @@ export function carryPlan(engine,p,intentTarget,dt=.016){
 function steerCarryVelocity(p,target,dt,mode='recover'){
   const speed=mag(p.vx||0,p.vy||0);if(speed<.08)return;
   const desired=unit(target.x-p.x,target.y-p.y),current=unit(p.vx,p.vy),delta=angle(current,desired),stats=carryStats(p);
-  const turnRate=mode==='touch'?6.8+stats.agility*.080:mode==='ready'?6.1+stats.agility*.074:5.2+stats.agility*.073;
-  const step=clamp(delta,-turnRate*dt,turnRate*dt),next=rotate(current,step),retention=mode==='ready'?.965:clamp(.987+(stats.agility-50)*.00008,.984,.992);
+  const turnRate=mode==='touch'?7.5+stats.agility*.086:mode==='ready'?7.0+stats.agility*.082:7.4+stats.agility*.090;
+  const step=clamp(delta,-turnRate*dt,turnRate*dt),next=rotate(current,step);
+  const sharpLoss=mode==='recover'?Math.min(.12,Math.abs(delta)*.065):0,retention=mode==='ready'?.94:clamp(.985-sharpLoss+(stats.agility-50)*.00008,.88,.992);
   p.vx=next.x*speed*retention;p.vy=next.y*speed*retention;
+}
+function plantCarryTurn(p,target,sharpness){
+  const speed=mag(p.vx||0,p.vy||0);if(speed<.12||sharpness<.28)return;
+  const stats=carryStats(p),current=unit(p.vx,p.vy),desired=unit(target.x-p.x,target.y-p.y),delta=angle(current,desired),step=clamp(delta,-.55,.55),next=rotate(current,step),retain=clamp(.72+stats.agility*.0018,.76,.91);
+  p.vx=next.x*speed*retain;p.vy=next.y*speed*retain;
 }
 
 const previousMovePlayer=MatchEngine.prototype.movePlayer;
 const previousDribbleTouchPower=MatchEngine.prototype.dribbleTouchPower;
+const previousResolveBallPlayerCollisions=MatchEngine.prototype.resolveBallPlayerCollisions;
 
 MatchEngine.prototype.movePlayer=function continuousPhysicalCarry(p,target,dt,track){
   if(!p?.dribbleIntent||p.kickIntent||!this.ball)return previousMovePlayer.call(this,p,target,dt,track);
@@ -62,10 +63,20 @@ MatchEngine.prototype.movePlayer=function continuousPhysicalCarry(p,target,dt,tr
   const plan=carryPlan(this,p,intended,dt);if(!plan)return previousMovePlayer.call(this,p,target,dt,track);
   const intent=p.dribbleIntent,oldX=intent.targetX,oldY=intent.targetY;intent.targetX=plan.facingTarget.x;intent.targetY=plan.facingTarget.y;
   p.carryState={...(p.carryState||{}),dir:plan.faceDir,intentDir:plan.intentDir,faceDir:plan.faceDir,turnBaseDir:plan.turnBaseDir,turnSide:plan.turnSide,cutNormal:null,cutContacts:0,cutStage:'none',cutStageTicks:0,cutJustHit:false,turnTicks:0,phase:plan.phase,aligned:plan.aligned,aroundError:plan.aroundError,lastTick:this.tick};
-  // Only player momentum changes here. The ball receives no movement until the engine resolves a
-  // real circle collision. Touch steering makes the runner actually cross the planned impact line.
+  plantCarryTurn(p,plan.moveTarget,Math.abs(plan.intentDelta));
   steerCarryVelocity(p,plan.moveTarget,dt,plan.phase);
   const result=previousMovePlayer.call(this,p,plan.moveTarget,dt,track);if(p.dribbleIntent){p.dribbleIntent.targetX=oldX;p.dribbleIntent.targetY=oldY;}return result;
+};
+
+// Repositioning may still physically overlap the free ball, but it is not a dribble stride.
+// Let the base resolver separate the circles/rebound them normally while preventing a dribble
+// impulse from being consumed until the player is actually aligned for phase='touch'.
+MatchEngine.prototype.resolveBallPlayerCollisions=function alignedCarryCollisions(){
+  const suppressed=[];
+  for(const p of this.players||[]){if(p?.dribbleIntent&&p.carryState?.phase!=='touch'&&(p.touchCooldown||0)<=0){suppressed.push(p);p.touchCooldown=Number.EPSILON;}}
+  const result=previousResolveBallPlayerCollisions.call(this);
+  for(const p of suppressed){if(p.touchCooldown===Number.EPSILON)p.touchCooldown=0;}
+  return result;
 };
 
 MatchEngine.prototype.dribbleTouchPower=function continuousCarryTouch(p){
@@ -74,4 +85,4 @@ MatchEngine.prototype.dribbleTouchPower=function continuousCarryTouch(p){
   const stats=carryStats(p),speed=mag(p.vx||0,p.vy||0),target=.16+speed*.105+(stats.control+stats.dribbling)*.00135;return clamp(Math.max(base*.82,target),.13,.62);
 };
 
-export const __carryIntelligenceV1={carryStats,intentDir,smoothFace,predictedBall,catchLeadFrames,steerCarryVelocity};
+export const __carryIntelligenceV1={carryStats,intentDir,smoothFace,predictedBall,catchLeadFrames,steerCarryVelocity,plantCarryTurn};
