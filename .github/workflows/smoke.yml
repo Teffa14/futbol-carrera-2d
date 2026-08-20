@@ -1,7 +1,10 @@
 name: Test Career Eleven
 on:
   push:
+    branches: [main]
   pull_request:
+permissions:
+  contents: write
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -19,3 +22,19 @@ jobs:
           name: production-static
           path: dist/index.html
           if-no-files-found: error
+      - name: Publish verified production artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          BUILD_SHA: ${{ github.sha }}
+        run: |
+          cp dist/index.html /tmp/career-eleven-index.html
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan production-publish
+          git rm -rf .
+          git clean -fdx
+          cp /tmp/career-eleven-index.html index.html
+          printf '%s\n' "$BUILD_SHA" > BUILD_SHA
+          git add index.html BUILD_SHA
+          git commit -m "deploy: ${BUILD_SHA}"
+          git push --force origin HEAD:production
