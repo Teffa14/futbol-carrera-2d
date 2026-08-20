@@ -22,35 +22,41 @@ export function carryPlan(engine,p,intentTarget,dt=.016){
   if(!engine?.ball||!p||!intentTarget)return null;
   const ball=engine.ball,state=p.carryState||{},stats=carryStats(p),raw=unit(intentTarget.x-ball.x,intentTarget.y-ball.y),previousIntent=intentDir(p,raw),intentDelta=angle(previousIntent,raw),actualGap=dist(p,ball),physicalContact=(p.r||7.25)+(ball.r||4.35),newTurn=Math.abs(intentDelta)>.28&&actualGap<34;
   const turnBaseDir=newTurn?previousIntent:(state.turnBaseDir||previousIntent),turnSide=newTurn?(Math.sign(intentDelta)||1):(state.turnSide||1),sideDir=rotate(turnBaseDir,turnSide*Math.PI/2);
+  // One deliberate rear-side collision changes the ball vector. Once that physical hit is
+  // confirmed, ordinary repeated carry contacts take over in the newly requested direction.
   const cutNormal=unit(turnBaseDir.x*.50+sideDir.x*.87,turnBaseDir.y*.50+sideDir.y*.87);
-  const inheritedContacts=newTurn?0:(state.cutContacts||0),turnTicks=newTurn?112:Math.max(0,(state.turnTicks||0)-1),completedCuts=inheritedContacts>=3,activeTurn=!completedCuts&&turnTicks>0;
+  const inheritedContacts=newTurn?0:(state.cutContacts||0),turnTicks=newTurn?84:Math.max(0,(state.turnTicks||0)-1),completedCut=inheritedContacts>=1,activeTurn=!completedCut&&turnTicks>0;
   const face=smoothFace(p,raw,dt),ballSpeed=mag(ball.vx||0,ball.vy||0),lead=catchLeadFrames(p,ball,physicalContact),future=predictedBall(ball,lead);
 
   let phase,moveTarget,aligned=false,nextTurnTicks=turnTicks;
   let cutStage=newTurn?'setup':(state.cutStage||'setup');
   let cutStageTicks=newTurn?0:(state.cutStageTicks||0);
   if(activeTurn){
-    const setupRadius=physicalContact+2.8,touchAvailable=(p.touchCooldown||0)<=dt+1e-6;
+    const setupRadius=physicalContact+3.4,touchAvailable=(p.touchCooldown||0)<=dt+1e-6;
+    const relX=ball.x-p.x,relY=ball.y-p.y,relGap=Math.hypot(relX,relY)||.0001;
+    const relNx=relX/relGap,relNy=relY/relGap,normalAlignment=dot(relNx,relNy,cutNormal.x,cutNormal.y);
+    const setupAligned=relGap<=physicalContact+8.5&&normalAlignment>.82;
+    const fallbackAligned=relGap<=physicalContact+12&&normalAlignment>.67;
 
-    if(state.cutJustHit){cutStage='setup';cutStageTicks=0;}
     if(cutStage==='setup'){
       cutStageTicks++;
-      if(touchAvailable&&cutStageTicks>=5){cutStage='strike';cutStageTicks=0;}
+      if(touchAvailable&&(setupAligned||(cutStageTicks>24&&fallbackAligned))){cutStage='strike';cutStageTicks=0;}
     }else{
       cutStageTicks++;
-      if(!touchAvailable||cutStageTicks>14){cutStage='setup';cutStageTicks=0;}
+      if(!touchAvailable||cutStageTicks>18){cutStage='setup';cutStageTicks=0;}
     }
 
     if(cutStage==='strike'){
       phase='cut-approach';aligned=true;
-      // Run through the ball, not merely to a point on the near side of its collision ring.
-      // The first circle intersection still determines the physical normal; the target beyond
-      // the ball only guarantees that a moving ball cannot keep the runner a few pixels short.
-      const through=clamp(7+stats.agility*.045+ballSpeed*1.1,9,14);
-      moveTarget={x:ball.x+cutNormal.x*through,y:ball.y+cutNormal.y*through};
+      // Stay on the intended rear-side radius. A target just inside the collision ring makes the
+      // player enter the ball along cutNormal instead of crossing the centre and turning the hit frontal.
+      const impactRadius=Math.max(physicalContact-1.35,physicalContact*.87);
+      moveTarget={x:ball.x-cutNormal.x*impactRadius,y:ball.y-cutNormal.y*impactRadius};
     }else{
       phase='cut-setup';
-      const targetBall=predictedBall(ball,Math.min(lead,.45));
+      // Reposition around the current free ball with minimal look-ahead. The angular relationship
+      // between player and ball, not elapsed time, decides when the strike may begin.
+      const targetBall=predictedBall(ball,Math.min(lead,.5));
       moveTarget={x:targetBall.x-cutNormal.x*setupRadius,y:targetBall.y-cutNormal.y*setupRadius};
     }
   }else{
