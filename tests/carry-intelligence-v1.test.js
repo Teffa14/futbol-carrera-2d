@@ -21,7 +21,8 @@ function engineWithCarrier(){
 }
 
 function simulateCarry(engine,p,target,frames){
-  let lost=0,maxGap=0;const phases={touch:0,cut:0,recover:0,other:0};
+  let lost=0,maxGap=0,minTurnGap=Infinity,maxTurnSide=-Infinity,minTurnSide=Infinity,maxTurnBase=-Infinity,minTurnBase=Infinity;
+  const phases={touch:0,cut:0,recover:0,other:0};
   for(let i=0;i<frames;i++){
     engine.updateFreeBall(1/60);
     p.dribbleIntent={targetX:target.x,targetY:target.y,ttl:1};
@@ -29,8 +30,14 @@ function simulateCarry(engine,p,target,frames){
     engine.resolveBallPlayerCollisions();
     const phase=p.carryState?.phase||'other';phases[phase]=(phases[phase]||0)+1;
     const gap=Math.hypot(engine.ball.x-p.x,engine.ball.y-p.y);maxGap=Math.max(maxGap,gap);if(gap>36)lost++;
+    const s=p.carryState;
+    if((phase==='turn'||phase==='cut-touch')&&s?.turnBaseDir){
+      const relX=engine.ball.x-p.x,relY=engine.ball.y-p.y,sideX=-s.turnBaseDir.y*(s.turnSide||1),sideY=s.turnBaseDir.x*(s.turnSide||1);
+      const base=relX*s.turnBaseDir.x+relY*s.turnBaseDir.y,side=relX*sideX+relY*sideY;
+      minTurnGap=Math.min(minTurnGap,gap);maxTurnSide=Math.max(maxTurnSide,side);minTurnSide=Math.min(minTurnSide,side);maxTurnBase=Math.max(maxTurnBase,base);minTurnBase=Math.min(minTurnBase,base);
+    }
   }
-  return{lost,maxGap,phases,finalGap:Math.hypot(engine.ball.x-p.x,engine.ball.y-p.y)};
+  return{lost,maxGap,phases,finalGap:Math.hypot(engine.ball.x-p.x,engine.ball.y-p.y),minTurnGap,maxTurnSide,minTurnSide,maxTurnBase,minTurnBase};
 }
 
 test('aligned carrier accelerates through the ball instead of stopping at the behind-ball point',()=>{
@@ -66,7 +73,8 @@ test('direction change keeps the carrier in the play while the free ball turns o
   simulateCarry(engine,p,{x:500,y:350},70);
   const before={x:engine.ball.x,y:engine.ball.y};
   const turn=simulateCarry(engine,p,{x:650,y:520},110),dx=engine.ball.x-before.x,dy=engine.ball.y-before.y;
-  const diag=`dx=${dx.toFixed(1)} dy=${dy.toFixed(1)} gap=${turn.finalGap.toFixed(1)} lost=${turn.lost} phases=${JSON.stringify(turn.phases)} ballV=${Math.hypot(engine.ball.vx,engine.ball.vy).toFixed(2)}`;
+  const fmt=v=>Number.isFinite(v)?v.toFixed(1):'n/a';
+  const diag=`dx=${dx.toFixed(1)} dy=${dy.toFixed(1)} gap=${turn.finalGap.toFixed(1)} lost=${turn.lost} phases=${JSON.stringify(turn.phases)} ballV=${Math.hypot(engine.ball.vx,engine.ball.vy).toFixed(2)} turnGapMin=${fmt(turn.minTurnGap)} side=[${fmt(turn.minTurnSide)},${fmt(turn.maxTurnSide)}] base=[${fmt(turn.minTurnBase)},${fmt(turn.maxTurnBase)}]`;
   assert.ok(dx>35,`ball should keep progressing during the turn; ${diag}`);
   assert.ok(dy>35,`turn should eventually move the free ball into the new lane; ${diag}`);
   assert.ok(turn.lost<45,`turn abandoned the ball; ${diag}`);
