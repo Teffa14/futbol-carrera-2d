@@ -30,8 +30,8 @@ test('trajectory predictor follows damping and a physical wall rebound',()=>{
 });
 
 test('faster reactive player reaches an earlier point on the same ball path',()=>{
-  const path=Array.from({length:10},(_,i)=>({frame:12+i*8,x:300+i*22,y:300,z:0,vx:2,vy:0})),fast={x:160,y:300,vx:0,vy:0,data:{pace:94}},slow={x:160,y:300,vx:0,vy:0,data:{pace:52}};
-  const a=bestReachableTrajectoryPoint(fast,path,{acceleration:94,sprintSpeed:94,reaction:90},{slackFrames:3}),b=bestReachableTrajectoryPoint(slow,path,{acceleration:52,sprintSpeed:52,reaction:48},{slackFrames:3});assert.ok(a&&b);assert.ok(a.frame<b.frame,`fast ${a.frame} should beat slow ${b.frame}`);
+  const path=Array.from({length:12},(_,i)=>({frame:45+i*12,x:250+i*18,y:300,z:0,vx:2,vy:0})),fast={x:160,y:300,vx:0,vy:0,data:{pace:94}},slow={x:160,y:300,vx:0,vy:0,data:{pace:52}};
+  const a=bestReachableTrajectoryPoint(fast,path,{acceleration:94,sprintSpeed:94,reaction:90},{slackFrames:3}),b=bestReachableTrajectoryPoint(slow,path,{acceleration:52,sprintSpeed:52,reaction:48},{slackFrames:3});assert.ok(a&&b,`both players should eventually reach the path: fast=${a?.frame}, slow=${b?.frame}`);assert.ok(a.frame<b.frame,`fast ${a.frame} should beat slow ${b.frame}`);
 });
 
 test('recent physical carrier keeps the actor role instead of a striker collapsing onto him',()=>{
