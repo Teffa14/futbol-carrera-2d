@@ -5,7 +5,7 @@ import {TrainingEngine} from './training-engine-v1.js';
 
 void __trainingPhysicsFixV2;
 
-const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let raf=null;
 let liveSession=null;
 
