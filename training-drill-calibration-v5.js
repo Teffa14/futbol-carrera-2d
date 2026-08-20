@@ -9,18 +9,18 @@ TrainingEngine.prototype.resetRep=function calibratedTrainingReset(rep,initial=f
   if(!q)return out;
   if(this.drill?.kind==='cones'){
     const flip=rep%2?1:-1;
-    // Close-control gates: short spacing and small lateral changes force repeated
-    // touches without asking the free ball to make impossible instant turns.
+    // Micro-gates measure actual close-control touches. Each gate still requires
+    // the free ball to physically advance and change its lateral line.
     q.gates=[
-      {x:142,y:402,w:76},
-      {x:170,y:386+flip*8,w:76},
-      {x:200,y:369-flip*10,w:76},
-      {x:232,y:350+flip*9,w:76},
+      {x:128,y:405,w:64},
+      {x:141,y:399+flip*4,w:64},
+      {x:156,y:391-flip*5,w:64},
+      {x:173,y:382+flip*5,w:64},
     ];
     this.cones=q.gates.flatMap(g=>[{x:g.x,y:g.y-g.w/2},{x:g.x,y:g.y+g.w/2}]);
     this.resetActor(this.player,105,405);Object.assign(this.ball,{x:118,y:405,vx:0,vy:0,lastActor:null,lastKick:null});
-    q.gateIndex=0;q.objective='Encadená cuatro puertas: toque corto, cambio de dirección y salida';q.previousBall={x:this.ball.x,y:this.ball.y};
-    this.repLength=Math.max(this.repLength,5.2);this.duration=this.repLength*Math.max(1,this.result?.reps||1);
+    q.gateIndex=0;q.objective='Cuatro microtoques entre conos y aceleración de salida';q.previousBall={x:this.ball.x,y:this.ball.y};
+    this.repLength=Math.max(this.repLength,5.0);this.duration=this.repLength*Math.max(1,this.result?.reps||1);
     this.repOrigin={px:this.player.x,py:this.player.y,bx:this.ball.x,by:this.ball.y};
   }
   if(this.drill?.kind==='1v1')q.defenderCommitTime=0;
@@ -33,12 +33,12 @@ TrainingEngine.prototype.scenario=function calibratedTrainingScenario(dt){
   if(!q||!m)return previousScenario.call(this,dt);
   if(this.drill?.kind==='cones'){
     const g=q.gates[q.gateIndex];
-    if(!g){q.phase='Salida después del slalom';q.repSuccess=true;this.dribbleTo(this.player,{x:310,y:325},dt,1.04);return;}
-    q.phase=`Puerta ${q.gateIndex+1}/${q.gates.length}`;
+    if(!g){q.phase='Aceleración de salida';q.repSuccess=true;this.dribbleTo(this.player,{x:270,y:330},dt,1.08);return;}
+    q.phase=`Microtoque ${q.gateIndex+1}/${q.gates.length}`;
     this.dribbleTo(this.player,g,dt,1.04);
     const reachedX=this.ball.x>=g.x-7;
     const insideY=Math.abs(this.ball.y-g.y)<=g.w*.66;
-    if(reachedX&&insideY){q.gateIndex++;m.gatesCleared++;this.flash='PUERTA';this.flashTimer=.22;}
+    if(reachedX&&insideY){q.gateIndex++;m.gatesCleared++;this.flash='TOQUE';this.flashTimer=.2;}
     q.previousBall={x:this.ball.x,y:this.ball.y};return;
   }
   if(this.drill?.kind==='1v1'){
