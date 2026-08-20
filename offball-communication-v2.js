@@ -3,9 +3,8 @@ import {FIELD,onsideLimit} from './football-rules-v2.js';
 import {chemistryAdjustedPassOptions,armChemistryPass} from './chemistry-decision-v1.js';
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-const dist=(a,b)=>Math.hypot((a?.x??0)-(b?.x??0),(a?.y??0)-(b?.y??0));
 function attackDir(team){return team===0?1:-1;}
-function roleCanCall(p){return p&&p.role!=='GK'&&!['CB'].includes(p.role);}
+function roleCanCall(p){return p&&p.role!=='GK'&&p.role!=='CB';}
 function keepOnside(engine,p,x){if(!['ST','LW','RW','CAM'].includes(p.role))return x;const limit=onsideLimit(engine,p.team),dir=attackDir(p.team);return dir>0?Math.min(x,limit-5):Math.max(x,limit+5);}
 
 export function callSignalFor(option,p){
@@ -29,13 +28,13 @@ function updateCalls(engine){
 const previousAiTarget=MatchEngine.prototype.aiTarget;
 MatchEngine.prototype.aiTarget=function communicatedOffBallTarget(p,pressers,actor,possession){
   const base=previousAiTarget.call(this,p,pressers,actor,possession),call=p?.callForPass;if(!call||call.untilTick<this.tick||possession!==p.team||p.kickIntent||p.dribbleIntent||actor?.id===p.id)return base;
-  if(call.untilTick<this.tick){p.callForPass=null;return base;}const x=keepOnside(this,p,call.targetX),weight=call.kind==='ahead'?.84:call.kind==='box'?.70:.58;return{x:clamp(base.x*(1-weight)+x*weight,FIELD.left+p.r,FIELD.right-p.r),y:clamp(base.y*(1-weight)+call.targetY*weight,FIELD.top+p.r,FIELD.bottom-p.r)};
+  const x=keepOnside(this,p,call.targetX);let weight=.58;if(call.kind==='ahead')weight=.84;else if(call.kind==='box')weight=.70;return{x:clamp(base.x*(1-weight)+x*weight,FIELD.left+p.r,FIELD.right-p.r),y:clamp(base.y*(1-weight)+call.targetY*weight,FIELD.top+p.r,FIELD.bottom-p.r)};
 };
 
 const previousPrepare=MatchEngine.prototype.prepareBallAction;
 MatchEngine.prototype.prepareBallAction=function respondToTeammateCall(p){
-  const result=previousPrepare.call(this,p);if(!p||p.role==='GK')return result;const calls=this.players.filter(m=>m.team===p.team&&m.callForPass?.fromId===p.id&&m.callForPass.untilTick>=this.tick).map(m=>({m,option:chemistryAdjustedPassOptions(this,p).find(o=>o.player.id===m.id)})).filter(x=>x.option&&x.option.open>14).sort((a,b)=>(b.option.adjustedScore+(b.m.callForPass?.score||0)*.22)-(a.option.adjustedScore+(a.m.callForPass?.score||0)*.22));const best=calls[0];if(!best)return result;
-  const requested=best.option.adjustedScore+(best.m.callForPass?.score||0)*.18,currentReceiver=p.kickIntent?.type==='pass'?p.kickIntent.receiverId:null,current=currentReceiver?chemistryAdjustedPassOptions(this,p).find(o=>o.player.id===currentReceiver):null;
+  const result=previousPrepare.call(this,p);if(!p||p.role==='GK')return result;const options=chemistryAdjustedPassOptions(this,p),calls=this.players.filter(m=>m.team===p.team&&m.callForPass?.fromId===p.id&&m.callForPass.untilTick>=this.tick).map(m=>({m,option:options.find(o=>o.player.id===m.id)})).filter(x=>x.option&&x.option.open>14).sort((a,b)=>(b.option.adjustedScore+(b.m.callForPass?.score||0)*.22)-(a.option.adjustedScore+(a.m.callForPass?.score||0)*.22));const best=calls[0];if(!best)return result;
+  const requested=best.option.adjustedScore+(best.m.callForPass?.score||0)*.18,currentReceiver=p.kickIntent?.type==='pass'?p.kickIntent.receiverId:null,current=currentReceiver?options.find(o=>o.player.id===currentReceiver):null;
   if(!p.kickIntent&&p.dribbleIntent&&requested>.58){p.dribbleIntent=null;return armChemistryPass(this,p,best.option);}if(p.kickIntent?.type==='pass'&&currentReceiver!==best.m.id&&requested>(current?.adjustedScore??-.5)+.075){const old=this.playerById(currentReceiver);if(old?.receiveIntent?.fromId===p.id)old.receiveIntent=null;p.kickIntent=null;p.passIntent=null;return armChemistryPass(this,p,best.option);}return result;
 };
 
