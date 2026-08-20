@@ -5,7 +5,7 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const ROLE_ORDER=['reserve','development','rotation','first-team-competition'];
 const ROLE_WEIGHT={reserve:55,development:64,rotation:73,'first-team-competition':82};
 const ROLE_WAGE={reserve:.58,development:.72,rotation:.9,'first-team-competition':1.08};
-const COUNTRY_WAGE_BASE={AR:180,BR:260,PT:520,FR:950,DE:1250,IT:1150,ES:1250,EN:1650};
+const COUNTRY_WAGE_BASE={ARB:120,AR:180,BR:260,PT:520,FR:950,DE:1250,IT:1150,ES:1250,EN:1650};
 
 function hash(seed){let h=2166136261;for(const ch of String(seed)){h^=ch.charCodeAt(0);h=Math.imul(h,16777619);}return h>>>0;}
 function noise(seed,span=8){return (hash(seed)%10001)/10000*span-span/2;}
@@ -28,7 +28,7 @@ export function positionCompetition(club,position,candidateOverall){
   const strongestOverall=ratings[0]||expectedSquadOverall;
   const referenceOverall=ratings.length?ratings.slice(0,3).reduce((sum,value)=>sum+value,0)/Math.min(3,ratings.length):expectedSquadOverall;
   const projectedRank=1+ratings.filter(rating=>rating>candidateOverall).length;
-  const shortageBonus=clamp((2-exact.length)*4, -4, 8);
+  const shortageBonus=clamp((2-exact.length)*4,-4,8);
   return{exactPositionCount:exact.length,sameFamilyCount:sameFamily.length,strongestOverall,referenceOverall:+referenceOverall.toFixed(1),projectedRank,shortageBonus};
 }
 
@@ -44,8 +44,8 @@ export function projectedSquadRole({candidateOverall,club,competition}){
 function contractForOffer(club,role,interest,seed){
   const countryId=club.countryId||club.country||'AR';
   const base=COUNTRY_WAGE_BASE[countryId]||500;
-  const reputation=clamp(Number(club.reputation||78),68,94);
-  const prestigeFactor=.75+(reputation-68)/26*1.15;
+  const reputation=clamp(Number(club.reputation||78),62,94);
+  const prestigeFactor=.72+(reputation-62)/32*1.18;
   const interestFactor=.88+clamp((interest-50)/50,0,.35);
   const weeklyWageUsd=round50(base*prestigeFactor*ROLE_WAGE[role]*interestFactor);
   const years=2+(hash(`${seed}|years`)%3);
@@ -86,13 +86,9 @@ function offerCandidate(state,club,index){
 }
 
 function diversifyOffers(candidates,count){
-  const selected=[],used=new Set();
-  const byRole=new Map();
+  const selected=[],used=new Set(),byRole=new Map();
   for(const role of ROLE_ORDER)byRole.set(role,candidates.filter(offer=>offer.projectedRole===role));
-  for(const role of ROLE_ORDER){
-    const best=byRole.get(role)?.[0];
-    if(best&&selected.length<count){selected.push(best);used.add(best.id);}
-  }
+  for(const role of ROLE_ORDER){const best=byRole.get(role)?.[0];if(best&&selected.length<count){selected.push(best);used.add(best.id);}}
   for(const offer of candidates){if(selected.length>=count)break;if(!used.has(offer.id)){selected.push(offer);used.add(offer.id);}}
   return selected.sort((a,b)=>b.interest-a.interest||b.clubReputation-a.clubReputation||a.clubName.localeCompare(b.clubName));
 }
@@ -109,8 +105,7 @@ export function generatePreCareerOffers(state,{clubs=clubsFromCountries(),count=
 
 export function acceptPreCareerOffer(state,offerId){
   if(!state||state.signed)throw new Error('Pre-career state is already signed');
-  const id=String(offerId||'').trim();
-  const offer=(state.offers||[]).find(entry=>entry.id===id);
+  const id=String(offerId||'').trim(),offer=(state.offers||[]).find(entry=>entry.id===id);
   if(!offer)throw new Error('Offer not found');
   const next=clone(state);
   next.signed=true;next.status='signed';next.stage='signed';next.selectedOffer=clone(offer);next.contract=clone(offer.contract);next.clubId=offer.clubId;next.countryId=offer.countryId;
