@@ -19,5 +19,6 @@ test('club matching resolves common external aliases without confusing first and
   assert.equal(matchClub('Ferro')?.id,'b-ferro');
   assert.equal(matchClub('San Martín Tucumán')?.id,'b-san-martin-tuc');
   assert.equal(matchClub('Estudiantes de Caseros')?.id,'b-estudiantes-ba');
+  assert.equal(matchClub('Güemes')?.id,'b-guemes');
   assert.equal(matchClub('CA Boca Juniors')?.id,'boca');
 });
