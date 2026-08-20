@@ -9,18 +9,18 @@ TrainingEngine.prototype.resetRep=function calibratedTrainingReset(rep,initial=f
   if(!q)return out;
   if(this.drill?.kind==='cones'){
     const flip=rep%2?1:-1;
-    // Compact, realistic close-control spacing. The direction still alternates,
-    // but the player can physically chain several touches inside one repetition.
+    // Close-control gates: short spacing and small lateral changes force repeated
+    // touches without asking the free ball to make impossible instant turns.
     q.gates=[
-      {x:145,y:399,w:58},
-      {x:176,y:375+flip*12,w:58},
-      {x:208,y:348-flip*14,w:58},
-      {x:242,y:320+flip*12,w:58},
+      {x:142,y:402,w:76},
+      {x:170,y:386+flip*8,w:76},
+      {x:200,y:369-flip*10,w:76},
+      {x:232,y:350+flip*9,w:76},
     ];
     this.cones=q.gates.flatMap(g=>[{x:g.x,y:g.y-g.w/2},{x:g.x,y:g.y+g.w/2}]);
     this.resetActor(this.player,105,405);Object.assign(this.ball,{x:118,y:405,vx:0,vy:0,lastActor:null,lastKick:null});
     q.gateIndex=0;q.objective='Encadená cuatro puertas: toque corto, cambio de dirección y salida';q.previousBall={x:this.ball.x,y:this.ball.y};
-    this.repLength=Math.max(this.repLength,5.1);this.duration=this.repLength*Math.max(1,this.result?.reps||1);
+    this.repLength=Math.max(this.repLength,5.2);this.duration=this.repLength*Math.max(1,this.result?.reps||1);
     this.repOrigin={px:this.player.x,py:this.player.y,bx:this.ball.x,by:this.ball.y};
   }
   if(this.drill?.kind==='1v1')q.defenderCommitTime=0;
@@ -33,7 +33,7 @@ TrainingEngine.prototype.scenario=function calibratedTrainingScenario(dt){
   if(!q||!m)return previousScenario.call(this,dt);
   if(this.drill?.kind==='cones'){
     const g=q.gates[q.gateIndex];
-    if(!g){q.phase='Salida después del slalom';q.repSuccess=true;this.dribbleTo(this.player,{x:325,y:285},dt,1.04);return;}
+    if(!g){q.phase='Salida después del slalom';q.repSuccess=true;this.dribbleTo(this.player,{x:310,y:325},dt,1.04);return;}
     q.phase=`Puerta ${q.gateIndex+1}/${q.gates.length}`;
     this.dribbleTo(this.player,g,dt,1.04);
     const reachedX=this.ball.x>=g.x-7;
