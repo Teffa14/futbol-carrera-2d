@@ -53,7 +53,11 @@ function secondaryForwardTarget(engine,p,path){
 
 const previousBallActor=MatchEngine.prototype.ballActor;
 MatchEngine.prototype.ballActor=function timeToArrivalBallActor(team){
-  const fallback=previousBallActor.call(this,team),speed=Math.hypot(this.ball.vx||0,this.ball.vy||0);if(this.restart?.active||this.ball.shotById||speed<1.05)return fallback;
+  const fallback=previousBallActor.call(this,team),speed=Math.hypot(this.ball.vx||0,this.ball.vy||0);if(this.restart?.active||this.ball.shotById)return fallback;
+  const recent=this.tick-this.ball.lastTouchTick<38&&this.ball.lastTeam===team?this.playerById(this.ball.lastPlayerId):null;
+  if(recent?.team===team&&!this.ball.intendedReceiverId&&dist(recent,this.ball)<58&&speed<4.8)return recent;
+  const intended=this.ball.intendedReceiverId?this.playerById(this.ball.intendedReceiverId):null;if(intended?.team===team&&speed>.72){const point=reach(this,intended);if(point)return intended;}
+  if(speed<.72)return fallback;
   const claim=computeTeamClaim(this,team);if(!claim?.player)return fallback;
   const fallbackPoint=fallback?reach(this,fallback):null,fallbackScore=fallbackPoint?candidateScore(this,fallback,fallbackPoint):-Infinity;
   return claim.score>fallbackScore+2.5?claim.player:fallback;
