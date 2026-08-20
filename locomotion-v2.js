@@ -57,7 +57,7 @@ function enforceKickoffHalf(engine){
 MatchEngine.prototype.resetPositions=function lawfulKickoff(...args){
   const result=originalResetPositions.apply(this,args);this.ball.r=BALL_RADIUS;this.ball.z=0;this.ball.vz=0;this.pendingOffside=null;
   for(const p of this.players){
-    p.r=PLAYER_RADIUS;p.y=clamp(FIELD.centerY+(p.y-FIELD.centerY)*1.09,FIELD.top+p.r,FIELD.bottom-p.r);p.x=clamp(FIELD.centerX+(p.x-FIELD.centerX)*1.025,FIELD.left+p.r,FIELD.right-p.r);p.homeX=p.x;p.homeY=p.y;p.receiveIntent=null;p.passIntent=null;p.brainUntil=0;
+    p.r=PLAYER_RADIUS;p.y=clamp(FIELD.centerY+(p.y-FIELD.centerY)*1.15,FIELD.top+p.r,FIELD.bottom-p.r);p.x=clamp(FIELD.centerX+(p.x-FIELD.centerX)*1.055,FIELD.left+p.r,FIELD.right-p.r);p.homeX=p.x;p.homeY=p.y;p.receiveIntent=null;p.passIntent=null;p.brainUntil=0;
   }
   enforceKickoffHalf(this);return result;
 };
@@ -86,7 +86,7 @@ MatchEngine.prototype.aiTarget=function restrainedGoalkeeperAi(p,pressers,actor,
 MatchEngine.prototype.draw=function widerPlayerCamera(ctx,width=1100,height=700,options={}){
   if(options.camera!=='player')return originalDraw.call(this,ctx,width,height,options);
   ctx.clearRect(0,0,width,height);ctx.fillStyle='#07130d';ctx.fillRect(0,0,width,height);const user=this.playerById(this.userId);if(!user)return originalDraw.call(this,ctx,width,height,{...options,camera:'full'});
-  const zoom=1.18,viewW=width/zoom,viewH=height/zoom,cx=lerp(user.x,this.ball.x,.18),cy=lerp(user.y,this.ball.y,.15),camX=clamp(cx-viewW/2,FIELD.left-35,FIELD.right+35-viewW),camY=clamp(cy-viewH/2,FIELD.top-35,FIELD.bottom+35-viewH);
+  const zoom=1.10,viewW=width/zoom,viewH=height/zoom,cx=lerp(user.x,this.ball.x,.18),cy=lerp(user.y,this.ball.y,.15),camX=clamp(cx-viewW/2,FIELD.left-35,FIELD.right+35-viewW),camY=clamp(cy-viewH/2,FIELD.top-35,FIELD.bottom+35-viewH);
   ctx.save();ctx.scale(zoom,zoom);ctx.translate(-camX,-camY);this.drawPitch(ctx);for(const p of this.players)this.drawPlayer(ctx,p);this.drawBall(ctx);ctx.restore();this.drawMiniMap(ctx,width,height);if(user)this.drawUserBadge(ctx,user,width,height);
 };
 
