@@ -15,11 +15,16 @@ MatchEngine.prototype.executeKick=function fullLaw11Kick(p,contactNormal){
 const previousTouch=MatchEngine.prototype.registerPhysicalTouch;
 MatchEngine.prototype.registerPhysicalTouch=function fullLaw11Involvement(p,type='touch'){
   const pending=this.pendingOffside;
-  if(pending&&this.tick>pending.kickTick){
-    const flagged=pending.candidateIds?.includes(p.id);
-    if(p.team===pending.attackingTeam&&flagged){awardOffside(this,{...pending,receiverId:p.id,x:p.x,y:p.y});return;}
-    if(p.team===pending.attackingTeam&&!flagged)this.pendingOffside=null;
-    else if(p.team!==pending.attackingTeam&&(type==='kick'||speed(this.ball)<4.8))this.pendingOffside=null;
+  if(!pending||this.tick<=pending.kickTick)return previousTouch.call(this,p,type);
+  const flagged=pending.candidateIds?.includes(p.id);
+  if(p.team===pending.attackingTeam&&flagged){awardOffside(this,{...pending,receiverId:p.id,x:p.x,y:p.y});return;}
+  if(p.team===pending.attackingTeam&&!flagged){this.pendingOffside=null;return previousTouch.call(this,p,type);}
+  if(p.team!==pending.attackingTeam){
+    const deliberate=type==='kick'||speed(this.ball)<4.8;
+    if(deliberate){this.pendingOffside=null;return previousTouch.call(this,p,type);}
+    // A high-speed block/deflection does not create a new phase. Older rule layers clear on every defender touch,
+    // so restore the snapshot after they record the physical contact.
+    const result=previousTouch.call(this,p,type);if(!this.pendingOffside)this.pendingOffside=pending;return result;
   }
   return previousTouch.call(this,p,type);
 };
