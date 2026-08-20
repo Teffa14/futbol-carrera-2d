@@ -2,7 +2,6 @@ import {TrainingEngine} from './training-engine-v1.js';
 import {__trainingDrillsV5 as v5} from './training-drills-v5.js';
 
 const CY=260,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 
 const previousReset=TrainingEngine.prototype.resetRep;
 TrainingEngine.prototype.resetRep=function calibratedTrainingReset(rep,initial=false){
@@ -10,15 +9,18 @@ TrainingEngine.prototype.resetRep=function calibratedTrainingReset(rep,initial=f
   if(!q)return out;
   if(this.drill?.kind==='cones'){
     const flip=rep%2?1:-1;
+    // Compact, realistic close-control spacing. The direction still alternates,
+    // but the player can physically chain several touches inside one repetition.
     q.gates=[
-      {x:152,y:395,w:54},
-      {x:192,y:360+flip*18,w:54},
-      {x:234,y:325-flip*20,w:54},
-      {x:278,y:288+flip*18,w:54},
+      {x:145,y:399,w:58},
+      {x:176,y:375+flip*12,w:58},
+      {x:208,y:348-flip*14,w:58},
+      {x:242,y:320+flip*12,w:58},
     ];
     this.cones=q.gates.flatMap(g=>[{x:g.x,y:g.y-g.w/2},{x:g.x,y:g.y+g.w/2}]);
     this.resetActor(this.player,105,405);Object.assign(this.ball,{x:118,y:405,vx:0,vy:0,lastActor:null,lastKick:null});
     q.gateIndex=0;q.objective='Encadená cuatro puertas: toque corto, cambio de dirección y salida';q.previousBall={x:this.ball.x,y:this.ball.y};
+    this.repLength=Math.max(this.repLength,5.1);this.duration=this.repLength*Math.max(1,this.result?.reps||1);
     this.repOrigin={px:this.player.x,py:this.player.y,bx:this.ball.x,by:this.ball.y};
   }
   if(this.drill?.kind==='1v1')q.defenderCommitTime=0;
@@ -31,9 +33,9 @@ TrainingEngine.prototype.scenario=function calibratedTrainingScenario(dt){
   if(!q||!m)return previousScenario.call(this,dt);
   if(this.drill?.kind==='cones'){
     const g=q.gates[q.gateIndex];
-    if(!g){q.phase='Salida después del slalom';q.repSuccess=true;this.dribbleTo(this.player,{x:355,y:270},dt,1.04);return;}
+    if(!g){q.phase='Salida después del slalom';q.repSuccess=true;this.dribbleTo(this.player,{x:325,y:285},dt,1.04);return;}
     q.phase=`Puerta ${q.gateIndex+1}/${q.gates.length}`;
-    this.dribbleTo(this.player,g,dt,1.03);
+    this.dribbleTo(this.player,g,dt,1.04);
     const reachedX=this.ball.x>=g.x-7;
     const insideY=Math.abs(this.ball.y-g.y)<=g.w*.66;
     if(reachedX&&insideY){q.gateIndex++;m.gatesCleared++;this.flash='PUERTA';this.flashTimer=.22;}
