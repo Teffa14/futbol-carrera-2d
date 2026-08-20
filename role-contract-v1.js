@@ -1,4 +1,5 @@
 import {PHASES} from './tactics.js';
+import {authorityPermissions} from './career-authority-v1.js';
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
@@ -79,7 +80,8 @@ export function createRoleContract({role='CM',tactics={},trust=0,influence=0}={}
     addRule(responsibilities,PHASES.BUILD_UP,{id:'coach-patient-build',action:'prefer-supported-progression-over-forced-direct-ball',priority:94,source:'coach'});
   }
 
-  const authority=clamp((Number(trust)||0)*.55+(Number(influence)||0)*.45,0,100);
+  const permissions=authorityPermissions({coachTrust:trust,tacticalInfluence:influence});
+  const authority=permissions.tacticalFreedom;
   const creativeFreedom=clamp(Math.round((BASE_FREEDOM[family]??45)+authority*.22),10,88);
   const roleDiscipline=clamp(Math.round(100-creativeFreedom*.55),48,94);
 
@@ -93,7 +95,7 @@ export function createRoleContract({role='CM',tactics={},trust=0,influence=0}={}
       directness:tactics.directness??50,
       tempo:tactics.tempo??50,
     },
-    authority:{trust:clamp(Number(trust)||0,0,100),influence:clamp(Number(influence)||0,0,100)},
+    authority:{trust:permissions.coachTrust,influence:permissions.tacticalInfluence,permissions},
     creativeFreedom,
     roleDiscipline,
     responsibilities,
