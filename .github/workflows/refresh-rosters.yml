@@ -7,6 +7,7 @@ on:
   pull_request:
     paths:
       - scripts/refresh-live-rosters.mjs
+      - scripts/fetch-sofa-division-b.py
       - division-b-data-v1.js
       - division-b-register-v1.js
       - .github/workflows/refresh-rosters.yml
@@ -14,6 +15,7 @@ on:
     branches: [main]
     paths:
       - scripts/refresh-live-rosters.mjs
+      - scripts/fetch-sofa-division-b.py
       - division-b-data-v1.js
       - division-b-register-v1.js
       - .github/workflows/refresh-rosters.yml
@@ -35,6 +37,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install protected-source transport
+        run: python -m pip install --disable-pip-version-check 'curl_cffi>=0.10,<1'
       - name: Build current roster snapshot and enforce coverage
         run: node scripts/refresh-live-rosters.mjs
       - name: Publish snapshot when data changed
