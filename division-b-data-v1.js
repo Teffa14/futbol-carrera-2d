@@ -2,7 +2,7 @@ const club=(id,name,reputation,color='#2f6f55',zone='A')=>({id,name,country:'ARB
 
 export const SECOND_DIVISION_CLUBS=Object.freeze([
   club('b-racing-cba','Racing de Córdoba',69,'#62b5e5','A'),
-  club('b-estudiantes-ba','Estudiantes',68,'#111111','A'),
+  club('b-estudiantes-ba','Estudiantes (Buenos Aires)',68,'#111111','A'),
   club('b-all-boys','All Boys',68,'#f4f4f4','A'),
   club('b-mitre-se','Mitre (Santiago del Estero)',66,'#f2c94c','A'),
   club('b-los-andes','Los Andes',66,'#d71920','A'),
