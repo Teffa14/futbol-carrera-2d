@@ -21,14 +21,16 @@ function engineWithCarrier(){
 }
 
 function simulateCarry(engine,p,target,frames){
-  let lost=0,maxGap=0,minTurnGap=Infinity,maxTurnSide=-Infinity,minTurnSide=Infinity,maxTurnBase=-Infinity,minTurnBase=Infinity;
+  let lost=0,maxGap=0,minTurnGap=Infinity,maxTurnSide=-Infinity,minTurnSide=Infinity,maxTurnBase=-Infinity,minTurnBase=Infinity,actualCutTouches=0,cutNormalX=0,cutNormalY=0,minCutNy=Infinity,maxCutNy=-Infinity;
   const phases={touch:0,cut:0,recover:0,other:0};
   for(let i=0;i<frames;i++){
     engine.updateFreeBall(1/60);
     p.dribbleIntent={targetX:target.x,targetY:target.y,ttl:1};
     engine.movePlayer(p,target,1/60,false);
+    const phase=p.carryState?.phase||'other',preCooldown=p.touchCooldown||0,preDx=engine.ball.x-p.x,preDy=engine.ball.y-p.y,preGap=Math.hypot(preDx,preDy)||.0001,preNx=preDx/preGap,preNy=preDy/preGap;
     engine.resolveBallPlayerCollisions();
-    const phase=p.carryState?.phase||'other';phases[phase]=(phases[phase]||0)+1;
+    if(phase==='cut-touch'&&(p.touchCooldown||0)>preCooldown+.04){actualCutTouches++;cutNormalX+=preNx;cutNormalY+=preNy;minCutNy=Math.min(minCutNy,preNy);maxCutNy=Math.max(maxCutNy,preNy);}
+    phases[phase]=(phases[phase]||0)+1;
     const gap=Math.hypot(engine.ball.x-p.x,engine.ball.y-p.y);maxGap=Math.max(maxGap,gap);if(gap>36)lost++;
     const s=p.carryState;
     if((phase==='turn'||phase==='cut-touch')&&s?.turnBaseDir){
@@ -37,7 +39,7 @@ function simulateCarry(engine,p,target,frames){
       minTurnGap=Math.min(minTurnGap,gap);maxTurnSide=Math.max(maxTurnSide,side);minTurnSide=Math.min(minTurnSide,side);maxTurnBase=Math.max(maxTurnBase,base);minTurnBase=Math.min(minTurnBase,base);
     }
   }
-  return{lost,maxGap,phases,finalGap:Math.hypot(engine.ball.x-p.x,engine.ball.y-p.y),minTurnGap,maxTurnSide,minTurnSide,maxTurnBase,minTurnBase};
+  return{lost,maxGap,phases,finalGap:Math.hypot(engine.ball.x-p.x,engine.ball.y-p.y),minTurnGap,maxTurnSide,minTurnSide,maxTurnBase,minTurnBase,actualCutTouches,avgCutNx:actualCutTouches?cutNormalX/actualCutTouches:0,avgCutNy:actualCutTouches?cutNormalY/actualCutTouches:0,minCutNy,maxCutNy};
 }
 
 test('aligned carrier accelerates through the ball instead of stopping at the behind-ball point',()=>{
@@ -73,8 +75,8 @@ test('direction change keeps the carrier in the play while the free ball turns o
   simulateCarry(engine,p,{x:500,y:350},70);
   const before={x:engine.ball.x,y:engine.ball.y};
   const turn=simulateCarry(engine,p,{x:650,y:520},110),dx=engine.ball.x-before.x,dy=engine.ball.y-before.y;
-  const fmt=v=>Number.isFinite(v)?v.toFixed(1):'n/a';
-  const diag=`dx=${dx.toFixed(1)} dy=${dy.toFixed(1)} gap=${turn.finalGap.toFixed(1)} lost=${turn.lost} phases=${JSON.stringify(turn.phases)} ballV=${Math.hypot(engine.ball.vx,engine.ball.vy).toFixed(2)} turnGapMin=${fmt(turn.minTurnGap)} side=[${fmt(turn.minTurnSide)},${fmt(turn.maxTurnSide)}] base=[${fmt(turn.minTurnBase)},${fmt(turn.maxTurnBase)}]`;
+  const fmt=v=>Number.isFinite(v)?v.toFixed(2):'n/a';
+  const diag=`dx=${dx.toFixed(1)} dy=${dy.toFixed(1)} gap=${turn.finalGap.toFixed(1)} lost=${turn.lost} phases=${JSON.stringify(turn.phases)} realCuts=${turn.actualCutTouches} cutN=(${fmt(turn.avgCutNx)},${fmt(turn.avgCutNy)}) cutNy=[${fmt(turn.minCutNy)},${fmt(turn.maxCutNy)}] ballV=${Math.hypot(engine.ball.vx,engine.ball.vy).toFixed(2)} turnGapMin=${fmt(turn.minTurnGap)} side=[${fmt(turn.minTurnSide)},${fmt(turn.maxTurnSide)}] base=[${fmt(turn.minTurnBase)},${fmt(turn.maxTurnBase)}]`;
   assert.ok(dx>35,`ball should keep progressing during the turn; ${diag}`);
   assert.ok(dy>35,`turn should eventually move the free ball into the new lane; ${diag}`);
   assert.ok(turn.lost<45,`turn abandoned the ball; ${diag}`);
