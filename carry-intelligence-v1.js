@@ -29,7 +29,7 @@ export function carryPlan(engine,p,intentTarget,dt=.016){
   const ball=engine.ball,state=p.carryState||{},stats=carryStats(p),raw=unit(intentTarget.x-ball.x,intentTarget.y-ball.y),previousIntent=intentDir(p,raw),intentDelta=angle(previousIntent,raw),actualGap=dist(p,ball),physicalContact=(p.r||7.25)+(ball.r||4.35),newTurn=Math.abs(intentDelta)>.28&&actualGap<34;
   const turnTouches=newTurn?0:Number(state.turnTouches||0);
   let turnAssistTicks=newTurn?72:Math.max(0,(state.turnAssistTicks||0)-1);
-  if(turnTouches>=3)turnAssistTicks=0;
+  if(turnTouches>=4)turnAssistTicks=0;
   const turnAssist=turnAssistTicks>0,turnDir=newTurn?raw:(turnAssist?savedTurnDir(state,raw):raw),carryDir=turnAssist?turnDir:raw;
   const face=smoothFace(p,raw,dt),ballSpeed=mag(ball.vx||0,ball.vy||0),lead=catchLeadFrames(p,ball,physicalContact),future=predictedBall(ball,lead);
   const rel={x:ball.x-p.x,y:ball.y-p.y},forward=dot(rel.x,rel.y,carryDir.x,carryDir.y),playerAround=actualGap>.01?unit(p.x-ball.x,p.y-ball.y):{x:-carryDir.x,y:-carryDir.y},behind={x:-carryDir.x,y:-carryDir.y},aroundError=angle(playerAround,behind),near=actualGap<=physicalContact+5.0,correctSide=Math.abs(aroundError)<.24,ballAhead=forward>physicalContact*.01;
@@ -63,7 +63,7 @@ const previousResolveBallPlayerCollisions=MatchEngine.prototype.resolveBallPlaye
 MatchEngine.prototype.movePlayer=function continuousPhysicalCarry(p,target,dt,track){
   if(!p?.dribbleIntent||p.kickIntent||!this.ball)return previousMovePlayer.call(this,p,target,dt,track);
   const intended={x:p.dribbleIntent.targetX,y:p.dribbleIntent.targetY};if(!Number.isFinite(intended.x)||!Number.isFinite(intended.y))return previousMovePlayer.call(this,p,target,dt,track);
-  const plan=carryPlan(this,p,intended,dt);if(!plan)return previousMovePlayer.call(this,p,target,dt,track);
+  const plan=carryPlan(this,p,intended,dt);if(!plan)return previousMovePlayer.call(this,p,intended,dt,track);
   const intent=p.dribbleIntent,oldX=intent.targetX,oldY=intent.targetY;intent.targetX=plan.facingTarget.x;intent.targetY=plan.facingTarget.y;
   p.carryState={...(p.carryState||{}),dir:plan.faceDir,intentDir:plan.intentDir,faceDir:plan.faceDir,turnDir:plan.turnDir,carryDir:plan.carryDir,turnBaseDir:plan.turnBaseDir,turnSide:plan.turnSide,turnAssistTicks:plan.turnAssistTicks,turnAssist:plan.turnAssist,turnTouches:plan.turnTouches,phase:plan.phase,aligned:plan.aligned,aroundError:plan.aroundError,lastTick:this.tick};
   plantCarryTurn(p,plan.moveTarget,Math.abs(plan.intentDelta));
@@ -86,7 +86,7 @@ MatchEngine.prototype.resolveBallPlayerCollisions=function alignedCarryCollision
     const p=watch.p;
     if(watch.before<=1e-6&&(p.touchCooldown||0)>.04&&p.carryState){
       p.carryState.turnTouches=Number(p.carryState.turnTouches||0)+1;
-      if(p.carryState.turnTouches>=3){p.carryState.turnAssistTicks=0;p.carryState.turnAssist=false;p.carryState.turnDir=null;}
+      if(p.carryState.turnTouches>=4){p.carryState.turnAssistTicks=0;p.carryState.turnAssist=false;p.carryState.turnDir=null;}
     }
   }
   return result;
@@ -97,8 +97,8 @@ MatchEngine.prototype.dribbleTouchPower=function continuousCarryTouch(p){
   if(state?.phase!=='touch')return base;
   const stats=carryStats(p),speed=mag(p.vx||0,p.vy||0);
   if(state.turnAssist){
-    const micro=.10+speed*.035+(stats.control+stats.dribbling)*.00055;
-    return clamp(Math.max(base*.42,micro),.12,.34);
+    const micro=.12+speed*.05+(stats.control+stats.dribbling)*.00072;
+    return clamp(Math.max(base*.50,micro),.14,.42);
   }
   const target=.16+speed*.105+(stats.control+stats.dribbling)*.00135;
   return clamp(Math.max(base*.82,target),.13,.62);
