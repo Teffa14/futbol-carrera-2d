@@ -55,3 +55,12 @@ test('planner never schedules the same player twice in one decision window',()=>
   assert.equal(new Set(changes.map(c=>c.outId)).size,2);
   assert.equal(new Set(changes.map(c=>c.inId)).size,2);
 });
+
+test('players already used in prior substitutions are excluded from later decision windows',()=>{
+  const starters=[p('cm1','CM',68,{fitness:60}),p('cm2','CM',67,{fitness:62})];
+  const bench=[p('cm3','CM',78),p('cm4','CM',74)];
+  const changes=planCoachSubstitutions({starters,bench,minute:82,scoreDiff:0,fatigueById:{cm1:92,cm2:90},maxSubs:2,alreadyUsed:['cm3']});
+  assert.ok(changes.length>=1);
+  assert.equal(changes.some(change=>change.inId==='cm3'),false);
+  assert.equal(changes.some(change=>change.inId==='cm4'),true);
+});
