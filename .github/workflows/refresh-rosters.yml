@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: '23 5 * * *'
   workflow_dispatch:
+  pull_request:
+    paths:
+      - scripts/refresh-live-rosters.mjs
+      - division-b-data-v1.js
+      - division-b-register-v1.js
+      - .github/workflows/refresh-rosters.yml
   push:
     branches: [main]
     paths:
@@ -16,7 +22,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: live-roster-refresh
+  group: live-roster-refresh-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -29,9 +35,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Build current roster snapshot
+      - name: Build current roster snapshot and enforce coverage
         run: node scripts/refresh-live-rosters.mjs
       - name: Publish snapshot when data changed
+        if: github.event_name != 'pull_request'
         run: |
           if git diff --quiet -- live-rosters.generated.js; then
             echo "Roster snapshot is already current."
