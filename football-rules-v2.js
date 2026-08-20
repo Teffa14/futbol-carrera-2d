@@ -1,7 +1,7 @@
 import {MatchEngine} from './engine.js';
 
 export const FIELD={left:55,right:1045,top:45,bottom:655,goalTop:295,goalBottom:405,centerX:550,centerY:350};
-export const PLAYER_RADIUS=7.25;
+export const PLAYER_RADIUS=6.7;
 export const BALL_RADIUS=4.35;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const unit=(x,y)=>{const d=Math.hypot(x,y)||1;return{x:x/d,y:y/d};};
@@ -60,7 +60,7 @@ export function awardOffside(engine,pending){
   if(!kicker)return false;
   for(const p of engine.players){p.kickIntent=null;p.dribbleIntent=null;p.receiveIntent=null;p.vx*=.15;p.vy*=.15;}
   const dir=team===0?1:-1,contact=kicker.r+engine.ball.r-.6;
-  kicker.x=x-dir*contact;kicker.y=y;kicker.vx=0;kicker.vy=0;kicker.facingX=dir;kicker.facingY=0;
+  kicker.x=x-dir*contact;kicker.y=y;kicker.vx=0;kicker.vy=0;kicker.facingX=dir;kicker.facingY=0;kicker.desiredFacingX=dir;kicker.desiredFacingY=0;
   Object.assign(engine.ball,{x,y,z:0,vz:0,vx:0,vy:0,lastTeam:team,lastPlayerId:kicker.id,passerId:null,intendedReceiverId:null,shotById:null,assistCandidateId:null,lastTouchTick:engine.tick});
   engine.lastPossessionTeam=team;engine.restart={active:true,kind:'free-kick',timer:.48,team,kickerId:kicker.id,x,y};engine.pushEvent('Offside',pending.attackingTeam,'offside');engine.pendingOffside=null;return true;
 }
