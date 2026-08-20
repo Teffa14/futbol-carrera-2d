@@ -9,6 +9,7 @@ const {TrainingMatchEngine}=await import('../training-match-engine-v1.js');
 await import('../training-intelligence-v7.js');
 
 const player=(name,id,role='ST',extra={})=>({name,instanceId:id,engineRole:role,position:role,pace:82,dribbling:82,ballControl:84,passing:72,shooting:76,vision:72,composure:76,physical:68,stamina:80,...extra});
+const unit=(x,y)=>{const d=Math.hypot(x,y)||1;return{x:x/d,y:y/d};};
 
 function engineWithCarrier(){
   const engine=new MatchEngine([player('Carrier','carrier')],[player('Defender','defender','CB',{pace:60,defense:75})],{userId:'carrier',seed:'carry-test'});
@@ -23,12 +24,21 @@ function engineWithCarrier(){
 function simulateCarry(engine,p,target,frames){
   let lost=0,maxGap=0,minTurnGap=Infinity,maxTurnSide=-Infinity,minTurnSide=Infinity,maxTurnBase=-Infinity,minTurnBase=Infinity,actualCutTouches=0,cutNormalX=0,cutNormalY=0,minCutNy=Infinity,maxCutNy=-Infinity;
   let physicalTouches=0,touchNormalX=0,touchNormalY=0,minTouchNy=Infinity,maxTouchNy=-Infinity,minTouchPhaseGap=Infinity,maxTouchPhaseGap=-Infinity,touchClosingSum=0,touchClosingFrames=0,minTouchClosing=Infinity,maxTouchClosing=-Infinity;
+  let recoverFrames=0,recoverNearMiss=0,recoverSideMiss=0,recoverAheadMiss=0,recoverGapMin=Infinity,recoverGapMax=-Infinity,recoverAroundMin=Infinity,recoverAroundMax=-Infinity,recoverAroundSum=0,turnAssistFrames=0,rawAngleMin=Infinity,rawAngleMax=-Infinity;
   const phases={},touchesByPhase={};
   for(let i=0;i<frames;i++){
     engine.updateFreeBall(1/60);
     p.dribbleIntent={targetX:target.x,targetY:target.y,ttl:1};
     engine.movePlayer(p,target,1/60,false);
     const phase=p.carryState?.phase||'other',beforeContacts=p.carryState?.cutContacts||0,beforeCooldown=p.touchCooldown||0,preDx=engine.ball.x-p.x,preDy=engine.ball.y-p.y,preGap=Math.hypot(preDx,preDy)||.0001,preNx=preDx/preGap,preNy=preDy/preGap;
+    const raw=unit(target.x-engine.ball.x,target.y-engine.ball.y),rawAngle=Math.atan2(raw.y,raw.x);rawAngleMin=Math.min(rawAngleMin,rawAngle);rawAngleMax=Math.max(rawAngleMax,rawAngle);
+    if((p.carryState?.turnAssistTicks||0)>0)turnAssistFrames++;
+    if(phase==='recover'){
+      recoverFrames++;recoverGapMin=Math.min(recoverGapMin,preGap);recoverGapMax=Math.max(recoverGapMax,preGap);
+      const around=Math.abs(p.carryState?.aroundError??Math.PI);recoverAroundMin=Math.min(recoverAroundMin,around);recoverAroundMax=Math.max(recoverAroundMax,around);recoverAroundSum+=around;
+      const physicalContact=p.r+engine.ball.r,near=preGap<=physicalContact+5.0,correctSide=around<.24,forward=preDx*raw.x+preDy*raw.y,ballAhead=forward>physicalContact*.01;
+      if(!near)recoverNearMiss++;if(!correctSide)recoverSideMiss++;if(!ballAhead)recoverAheadMiss++;
+    }
     if(phase==='touch'){
       minTouchPhaseGap=Math.min(minTouchPhaseGap,preGap);maxTouchPhaseGap=Math.max(maxTouchPhaseGap,preGap);
       const closing=(p.vx-(engine.ball.vx||0))*preNx+(p.vy-(engine.ball.vy||0))*preNy;
@@ -47,7 +57,7 @@ function simulateCarry(engine,p,target,frames){
       minTurnGap=Math.min(minTurnGap,gap);maxTurnSide=Math.max(maxTurnSide,side);minTurnSide=Math.min(minTurnSide,side);maxTurnBase=Math.max(maxTurnBase,base);minTurnBase=Math.min(minTurnBase,base);
     }
   }
-  return{lost,maxGap,phases,finalGap:Math.hypot(engine.ball.x-p.x,engine.ball.y-p.y),minTurnGap,maxTurnSide,minTurnSide,maxTurnBase,minTurnBase,actualCutTouches,avgCutNx:actualCutTouches?cutNormalX/actualCutTouches:0,avgCutNy:actualCutTouches?cutNormalY/actualCutTouches:0,minCutNy,maxCutNy,physicalTouches,avgTouchNx:physicalTouches?touchNormalX/physicalTouches:0,avgTouchNy:physicalTouches?touchNormalY/physicalTouches:0,minTouchNy,maxTouchNy,touchesByPhase,minTouchPhaseGap,maxTouchPhaseGap,avgTouchClosing:touchClosingFrames?touchClosingSum/touchClosingFrames:0,minTouchClosing,maxTouchClosing};
+  return{lost,maxGap,phases,finalGap:Math.hypot(engine.ball.x-p.x,engine.ball.y-p.y),minTurnGap,maxTurnSide,minTurnSide,maxTurnBase,minTurnBase,actualCutTouches,avgCutNx:actualCutTouches?cutNormalX/actualCutTouches:0,avgCutNy:actualCutTouches?cutNormalY/actualCutTouches:0,minCutNy,maxCutNy,physicalTouches,avgTouchNx:physicalTouches?touchNormalX/physicalTouches:0,avgTouchNy:physicalTouches?touchNormalY/physicalTouches:0,minTouchNy,maxTouchNy,touchesByPhase,minTouchPhaseGap,maxTouchPhaseGap,avgTouchClosing:touchClosingFrames?touchClosingSum/touchClosingFrames:0,minTouchClosing,maxTouchClosing,recoverFrames,recoverNearMiss,recoverSideMiss,recoverAheadMiss,recoverGapMin,recoverGapMax,avgRecoverAround:recoverFrames?recoverAroundSum/recoverFrames:0,recoverAroundMin,recoverAroundMax,turnAssistFrames,rawAngleMin,rawAngleMax};
 }
 
 test('aligned carrier accelerates through the ball instead of stopping at the behind-ball point',()=>{
@@ -84,7 +94,7 @@ test('direction change keeps the carrier in the play while the free ball turns o
   const before={x:engine.ball.x,y:engine.ball.y};
   const turn=simulateCarry(engine,p,{x:650,y:520},110),dx=engine.ball.x-before.x,dy=engine.ball.y-before.y;
   const fmt=v=>Number.isFinite(v)?v.toFixed(2):'n/a';
-  const diag=`dx=${dx.toFixed(1)} dy=${dy.toFixed(1)} gap=${turn.finalGap.toFixed(1)} lost=${turn.lost} phases=${JSON.stringify(turn.phases)} touches=${turn.physicalTouches} touchPhase=${JSON.stringify(turn.touchesByPhase)} touchN=(${fmt(turn.avgTouchNx)},${fmt(turn.avgTouchNy)}) touchNy=[${fmt(turn.minTouchNy)},${fmt(turn.maxTouchNy)}] touchGap=[${fmt(turn.minTouchPhaseGap)},${fmt(turn.maxTouchPhaseGap)}] closing=${fmt(turn.avgTouchClosing)} [${fmt(turn.minTouchClosing)},${fmt(turn.maxTouchClosing)}] realCuts=${turn.actualCutTouches} ballV=${Math.hypot(engine.ball.vx,engine.ball.vy).toFixed(2)}`;
+  const diag=`dx=${dx.toFixed(1)} dy=${dy.toFixed(1)} gap=${turn.finalGap.toFixed(1)} lost=${turn.lost} phases=${JSON.stringify(turn.phases)} touches=${turn.physicalTouches} touchPhase=${JSON.stringify(turn.touchesByPhase)} touchN=(${fmt(turn.avgTouchNx)},${fmt(turn.avgTouchNy)}) touchNy=[${fmt(turn.minTouchNy)},${fmt(turn.maxTouchNy)}] touchGap=[${fmt(turn.minTouchPhaseGap)},${fmt(turn.maxTouchPhaseGap)}] closing=${fmt(turn.avgTouchClosing)} [${fmt(turn.minTouchClosing)},${fmt(turn.maxTouchClosing)}] recoverMiss near=${turn.recoverNearMiss}/${turn.recoverFrames} side=${turn.recoverSideMiss}/${turn.recoverFrames} ahead=${turn.recoverAheadMiss}/${turn.recoverFrames} recoverGap=[${fmt(turn.recoverGapMin)},${fmt(turn.recoverGapMax)}] around=${fmt(turn.avgRecoverAround)} [${fmt(turn.recoverAroundMin)},${fmt(turn.recoverAroundMax)}] assist=${turn.turnAssistFrames} rawAngle=[${fmt(turn.rawAngleMin)},${fmt(turn.rawAngleMax)}] ballV=${Math.hypot(engine.ball.vx,engine.ball.vy).toFixed(2)}`;
   assert.ok(dx>35,`ball should keep progressing during the turn; ${diag}`);
   assert.ok(dy>35,`turn should eventually move the free ball into the new lane; ${diag}`);
   assert.ok(turn.lost<45,`turn abandoned the ball; ${diag}`);
