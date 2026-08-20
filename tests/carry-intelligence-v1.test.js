@@ -1,0 +1,117 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+
+const {MatchEngine}=await import('../engine.js');
+await import('../football-rules-v2.js');
+await import('../locomotion-v2.js');
+const {carryPlan}=await import('../carry-intelligence-v1.js');
+const {TrainingMatchEngine}=await import('../training-match-engine-v1.js');
+await import('../training-intelligence-v7.js');
+
+const player=(name,id,role='ST',extra={})=>({name,instanceId:id,engineRole:role,position:role,pace:82,dribbling:82,ballControl:84,passing:72,shooting:76,vision:72,composure:76,physical:68,stamina:80,...extra});
+const unit=(x,y)=>{const d=Math.hypot(x,y)||1;return{x:x/d,y:y/d};};
+
+function engineWithCarrier(){
+  const engine=new MatchEngine([player('Carrier','carrier')],[player('Defender','defender','CB',{pace:60,defense:75})],{userId:'carrier',seed:'carry-test'});
+  engine.restart=null;
+  const p=engine.playerById('carrier'),d=engine.playerById('defender');
+  p.x=220;p.y=350;p.vx=0;p.vy=0;p.facingX=1;p.facingY=0;
+  d.x=900;d.y=120;d.vx=0;d.vy=0;
+  Object.assign(engine.ball,{x:p.x+p.r+engine.ball.r-.4,y:p.y,vx:0,vy:0,z:0,vz:0,lastTeam:0,lastPlayerId:p.id,lastTouchTick:engine.tick});
+  return{engine,p,d};
+}
+
+function simulateCarry(engine,p,target,frames){
+  let lost=0,maxGap=0,minTurnGap=Infinity,maxTurnSide=-Infinity,minTurnSide=Infinity,maxTurnBase=-Infinity,minTurnBase=Infinity,actualCutTouches=0,cutNormalX=0,cutNormalY=0,minCutNy=Infinity,maxCutNy=-Infinity;
+  let physicalTouches=0,touchNormalX=0,touchNormalY=0,minTouchNy=Infinity,maxTouchNy=-Infinity,minTouchPhaseGap=Infinity,maxTouchPhaseGap=-Infinity,touchClosingSum=0,touchClosingFrames=0,minTouchClosing=Infinity,maxTouchClosing=-Infinity;
+  let recoverFrames=0,recoverNearMiss=0,recoverSideMiss=0,recoverAheadMiss=0,recoverGapMin=Infinity,recoverGapMax=-Infinity,recoverAroundMin=Infinity,recoverAroundMax=-Infinity,recoverAroundSum=0,turnAssistFrames=0,rawAngleMin=Infinity,rawAngleMax=-Infinity;
+  const phases={},touchesByPhase={};
+  for(let i=0;i<frames;i++){
+    engine.updateFreeBall(1/60);
+    p.dribbleIntent={targetX:target.x,targetY:target.y,ttl:1};
+    engine.movePlayer(p,target,1/60,false);
+    const phase=p.carryState?.phase||'other',beforeContacts=p.carryState?.cutContacts||0,beforeCooldown=p.touchCooldown||0,preDx=engine.ball.x-p.x,preDy=engine.ball.y-p.y,preGap=Math.hypot(preDx,preDy)||.0001,preNx=preDx/preGap,preNy=preDy/preGap;
+    const raw=unit(target.x-engine.ball.x,target.y-engine.ball.y),rawAngle=Math.atan2(raw.y,raw.x);rawAngleMin=Math.min(rawAngleMin,rawAngle);rawAngleMax=Math.max(rawAngleMax,rawAngle);
+    if((p.carryState?.turnAssistTicks||0)>0)turnAssistFrames++;
+    if(phase==='recover'){
+      recoverFrames++;recoverGapMin=Math.min(recoverGapMin,preGap);recoverGapMax=Math.max(recoverGapMax,preGap);
+      const around=Math.abs(p.carryState?.aroundError??Math.PI);recoverAroundMin=Math.min(recoverAroundMin,around);recoverAroundMax=Math.max(recoverAroundMax,around);recoverAroundSum+=around;
+      const physicalContact=p.r+engine.ball.r,near=preGap<=physicalContact+5.0,correctSide=around<.24,forward=preDx*raw.x+preDy*raw.y,ballAhead=forward>physicalContact*.01;
+      if(!near)recoverNearMiss++;if(!correctSide)recoverSideMiss++;if(!ballAhead)recoverAheadMiss++;
+    }
+    if(phase==='touch'){
+      minTouchPhaseGap=Math.min(minTouchPhaseGap,preGap);maxTouchPhaseGap=Math.max(maxTouchPhaseGap,preGap);
+      const closing=(p.vx-(engine.ball.vx||0))*preNx+(p.vy-(engine.ball.vy||0))*preNy;
+      touchClosingSum+=closing;touchClosingFrames++;minTouchClosing=Math.min(minTouchClosing,closing);maxTouchClosing=Math.max(maxTouchClosing,closing);
+    }
+    engine.resolveBallPlayerCollisions();
+    const afterContacts=p.carryState?.cutContacts||0,afterCooldown=p.touchCooldown||0;
+    if(afterCooldown>beforeCooldown+.04){physicalTouches++;touchNormalX+=preNx;touchNormalY+=preNy;minTouchNy=Math.min(minTouchNy,preNy);maxTouchNy=Math.max(maxTouchNy,preNy);touchesByPhase[phase]=(touchesByPhase[phase]||0)+1;}
+    if(afterContacts>beforeContacts){actualCutTouches+=afterContacts-beforeContacts;cutNormalX+=preNx;cutNormalY+=preNy;minCutNy=Math.min(minCutNy,preNy);maxCutNy=Math.max(maxCutNy,preNy);}
+    phases[phase]=(phases[phase]||0)+1;
+    const gap=Math.hypot(engine.ball.x-p.x,engine.ball.y-p.y);maxGap=Math.max(maxGap,gap);if(gap>36)lost++;
+    const s=p.carryState;
+    if((phase==='cut-setup'||phase==='cut-approach'||phase==='cut-hit')&&s?.turnBaseDir){
+      const relX=engine.ball.x-p.x,relY=engine.ball.y-p.y,sideX=-s.turnBaseDir.y*(s.turnSide||1),sideY=s.turnBaseDir.x*(s.turnSide||1);
+      const base=relX*s.turnBaseDir.x+relY*s.turnBaseDir.y,side=relX*sideX+relY*sideY;
+      minTurnGap=Math.min(minTurnGap,gap);maxTurnSide=Math.max(maxTurnSide,side);minTurnSide=Math.min(minTurnSide,side);maxTurnBase=Math.max(maxTurnBase,base);minTurnBase=Math.min(minTurnBase,base);
+    }
+  }
+  return{lost,maxGap,phases,finalGap:Math.hypot(engine.ball.x-p.x,engine.ball.y-p.y),minTurnGap,maxTurnSide,minTurnSide,maxTurnBase,minTurnBase,actualCutTouches,avgCutNx:actualCutTouches?cutNormalX/actualCutTouches:0,avgCutNy:actualCutTouches?cutNormalY/actualCutTouches:0,minCutNy,maxCutNy,physicalTouches,avgTouchNx:physicalTouches?touchNormalX/physicalTouches:0,avgTouchNy:physicalTouches?touchNormalY/physicalTouches:0,minTouchNy,maxTouchNy,touchesByPhase,minTouchPhaseGap,maxTouchPhaseGap,avgTouchClosing:touchClosingFrames?touchClosingSum/touchClosingFrames:0,minTouchClosing,maxTouchClosing,recoverFrames,recoverNearMiss,recoverSideMiss,recoverAheadMiss,recoverGapMin,recoverGapMax,avgRecoverAround:recoverFrames?recoverAroundSum/recoverFrames:0,recoverAroundMin,recoverAroundMax,turnAssistFrames,rawAngleMin,rawAngleMax};
+}
+
+test('aligned carrier accelerates through the ball instead of stopping at the behind-ball point',()=>{
+  const {engine,p}=engineWithCarrier(),target={x:780,y:350};
+  p.dribbleIntent={targetX:target.x,targetY:target.y,ttl:1};
+  const plan=carryPlan(engine,p,target,1/60);
+  assert.equal(plan.phase,'touch');
+  assert.ok(plan.moveTarget.x>engine.ball.x,'movement target must continue through the ball');
+  assert.ok(Math.abs(plan.moveTarget.y-engine.ball.y)<2,'straight carry should not create a lateral profile');
+});
+
+test('a sharp requested turn is introduced progressively instead of instantly profiling sideways',()=>{
+  const {engine,p}=engineWithCarrier();
+  p.carryState={dir:{x:1,y:0},phase:'touch',aligned:true,turnSharpness:0,lastTick:0};
+  p.dribbleIntent={targetX:engine.ball.x,targetY:620,ttl:1};
+  const plan=carryPlan(engine,p,{x:engine.ball.x,y:620},1/60);
+  assert.ok(plan.dir.x>.94,'first steering frame should preserve forward body momentum');
+  assert.ok(Math.abs(plan.dir.y)<.35,'player must not snap to a sideways profile in one frame');
+  assert.ok(plan.turnSharpness>1,'the plan should recognise a genuinely sharp change');
+});
+
+test('straight physical carry advances through repeated contacts without losing the ball after the first nudge',()=>{
+  const {engine,p}=engineWithCarrier(),startX=engine.ball.x;
+  const run=simulateCarry(engine,p,{x:820,y:350},150);
+  assert.ok(engine.ball.x>startX+95,`ball only advanced ${engine.ball.x-startX}`);
+  assert.ok(p.x>startX+65,`player only advanced ${p.x-startX}`);
+  assert.ok(run.lost<30,`carrier was detached from ball for ${run.lost} frames`);
+  assert.ok(Math.abs(engine.ball.y-350)<18,'straight carry should stay in the same lane');
+});
+
+test('direction change keeps the carrier in the play while the free ball turns over several touches',()=>{
+  const {engine,p}=engineWithCarrier();
+  simulateCarry(engine,p,{x:500,y:350},70);
+  const before={x:engine.ball.x,y:engine.ball.y};
+  const turn=simulateCarry(engine,p,{x:650,y:520},110),dx=engine.ball.x-before.x,dy=engine.ball.y-before.y;
+  const fmt=v=>Number.isFinite(v)?v.toFixed(2):'n/a';
+  const diag=`dx=${dx.toFixed(1)} dy=${dy.toFixed(1)} gap=${turn.finalGap.toFixed(1)} lost=${turn.lost} phases=${JSON.stringify(turn.phases)} touches=${turn.physicalTouches} touchPhase=${JSON.stringify(turn.touchesByPhase)} touchN=(${fmt(turn.avgTouchNx)},${fmt(turn.avgTouchNy)}) touchNy=[${fmt(turn.minTouchNy)},${fmt(turn.maxTouchNy)}] touchGap=[${fmt(turn.minTouchPhaseGap)},${fmt(turn.maxTouchPhaseGap)}] closing=${fmt(turn.avgTouchClosing)} [${fmt(turn.minTouchClosing)},${fmt(turn.maxTouchClosing)}] recoverMiss near=${turn.recoverNearMiss}/${turn.recoverFrames} side=${turn.recoverSideMiss}/${turn.recoverFrames} ahead=${turn.recoverAheadMiss}/${turn.recoverFrames} recoverGap=[${fmt(turn.recoverGapMin)},${fmt(turn.recoverGapMax)}] around=${fmt(turn.avgRecoverAround)} [${fmt(turn.recoverAroundMin)},${fmt(turn.recoverAroundMax)}] assist=${turn.turnAssistFrames} rawAngle=[${fmt(turn.rawAngleMin)},${fmt(turn.rawAngleMax)}] ballV=${Math.hypot(engine.ball.vx,engine.ball.vy).toFixed(2)}`;
+  assert.ok(dx>35,`ball should keep progressing during the turn; ${diag}`);
+  assert.ok(dy>35,`turn should eventually move the free ball into the new lane; ${diag}`);
+  assert.ok(turn.lost<45,`turn abandoned the ball; ${diag}`);
+  assert.ok(turn.finalGap<42,`player should finish close enough to continue the next touch; ${diag}`);
+});
+
+test('training cones use the same continuous carry layer and still finish with finite free-ball physics',()=>{
+  const drill={id:'cone-dribble',name:'Slalom de conos',kind:'cones'},result={seed:'carry-training',reps:2,quality:78,grade:'B',successes:0},data=player('Training User','training-user','CM');
+  const engine=new TrainingMatchEngine(drill,result,data);
+  let carryFrames=0;
+  for(let i=0;i<1500&&!engine.finished;i++){
+    engine.step(1/60);
+    if(engine.player.carryState?.lastTick===engine.tick)carryFrames++;
+    assert.ok(Number.isFinite(engine.ball.x)&&Number.isFinite(engine.ball.y));
+  }
+  assert.ok(engine.finished,'training session should finish');
+  assert.ok(carryFrames>80,`continuous carry was active for only ${carryFrames} frames`);
+  assert.ok(engine.trainingMetricsV6.gatesCleared>=4,'slalom should physically clear multiple gates');
+  assert.equal(Object.hasOwn(engine.ball,'ownerId'),false);
+});
