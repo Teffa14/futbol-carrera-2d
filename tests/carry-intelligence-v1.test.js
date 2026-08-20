@@ -21,15 +21,16 @@ function engineWithCarrier(){
 }
 
 function simulateCarry(engine,p,target,frames){
-  let lost=0,maxGap=0;
+  let lost=0,maxGap=0;const phases={touch:0,cut:0,recover:0,other:0};
   for(let i=0;i<frames;i++){
     engine.updateFreeBall(1/60);
     p.dribbleIntent={targetX:target.x,targetY:target.y,ttl:1};
     engine.movePlayer(p,target,1/60,false);
     engine.resolveBallPlayerCollisions();
+    const phase=p.carryState?.phase||'other';phases[phase]=(phases[phase]||0)+1;
     const gap=Math.hypot(engine.ball.x-p.x,engine.ball.y-p.y);maxGap=Math.max(maxGap,gap);if(gap>36)lost++;
   }
-  return{lost,maxGap};
+  return{lost,maxGap,phases,finalGap:Math.hypot(engine.ball.x-p.x,engine.ball.y-p.y)};
 }
 
 test('aligned carrier accelerates through the ball instead of stopping at the behind-ball point',()=>{
@@ -64,11 +65,12 @@ test('direction change keeps the carrier in the play while the free ball turns o
   const {engine,p}=engineWithCarrier();
   simulateCarry(engine,p,{x:500,y:350},70);
   const before={x:engine.ball.x,y:engine.ball.y};
-  const turn=simulateCarry(engine,p,{x:650,y:520},110);
-  assert.ok(engine.ball.x>before.x+35,'ball should keep progressing during the turn');
-  assert.ok(engine.ball.y>before.y+35,'turn should eventually move the free ball into the new lane');
-  assert.ok(turn.lost<45,`turn abandoned the ball for ${turn.lost} frames`);
-  assert.ok(Math.hypot(engine.ball.x-p.x,engine.ball.y-p.y)<42,'player should finish close enough to continue the next touch');
+  const turn=simulateCarry(engine,p,{x:650,y:520},110),dx=engine.ball.x-before.x,dy=engine.ball.y-before.y;
+  const diag=`dx=${dx.toFixed(1)} dy=${dy.toFixed(1)} gap=${turn.finalGap.toFixed(1)} lost=${turn.lost} phases=${JSON.stringify(turn.phases)} ballV=${Math.hypot(engine.ball.vx,engine.ball.vy).toFixed(2)}`;
+  assert.ok(dx>35,`ball should keep progressing during the turn; ${diag}`);
+  assert.ok(dy>35,`turn should eventually move the free ball into the new lane; ${diag}`);
+  assert.ok(turn.lost<45,`turn abandoned the ball; ${diag}`);
+  assert.ok(turn.finalGap<42,`player should finish close enough to continue the next touch; ${diag}`);
 });
 
 test('training cones use the same continuous carry layer and still finish with finite free-ball physics',()=>{
