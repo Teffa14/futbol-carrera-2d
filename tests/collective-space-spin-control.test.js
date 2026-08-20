@@ -5,8 +5,9 @@ import {PLAYER_RADIUS} from '../football-rules-v2.js';
 import {closeControlOrbitVelocity} from '../close-control-orbit-v1.js';
 import {openPlaySpinPlan} from '../open-play-spin-v1.js';
 import {predictBallPath} from '../trajectory-core-v1.js';
-import {collectiveShapeTarget,bestAttackingSpace,postPassRunTarget,crossTrajectoryTarget,isPresser} from '../collective-space-play-v1.js';
+import {collectiveShapeTarget,bestAttackingSpace,postPassRunTarget,crossTrajectoryTarget,__collectiveSpacePlayV1} from '../collective-space-play-v1.js';
 
+const {isPresser}=__collectiveSpacePlayV1;
 const data=(extra={})=>({pace:74,shooting:72,passing:74,dribbling:72,ballControl:75,composure:74,stamina:74,physical:70,vision:72,...extra});
 const player=(id,team,role,x,y,extra={})=>({id,team,role,x,y,vx:0,vy:0,r:PLAYER_RADIUS,data:data(extra),homeX:x,homeY:y});
 
