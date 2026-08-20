@@ -22,18 +22,19 @@ function engineWithCarrier(){
 
 function simulateCarry(engine,p,target,frames){
   let lost=0,maxGap=0,minTurnGap=Infinity,maxTurnSide=-Infinity,minTurnSide=Infinity,maxTurnBase=-Infinity,minTurnBase=Infinity,actualCutTouches=0,cutNormalX=0,cutNormalY=0,minCutNy=Infinity,maxCutNy=-Infinity;
-  const phases={touch:0,cut:0,recover:0,other:0};
+  const phases={};
   for(let i=0;i<frames;i++){
     engine.updateFreeBall(1/60);
     p.dribbleIntent={targetX:target.x,targetY:target.y,ttl:1};
     engine.movePlayer(p,target,1/60,false);
-    const phase=p.carryState?.phase||'other',preCooldown=p.touchCooldown||0,preDx=engine.ball.x-p.x,preDy=engine.ball.y-p.y,preGap=Math.hypot(preDx,preDy)||.0001,preNx=preDx/preGap,preNy=preDy/preGap;
+    const phase=p.carryState?.phase||'other',beforeContacts=p.carryState?.cutContacts||0,preDx=engine.ball.x-p.x,preDy=engine.ball.y-p.y,preGap=Math.hypot(preDx,preDy)||.0001,preNx=preDx/preGap,preNy=preDy/preGap;
     engine.resolveBallPlayerCollisions();
-    if(phase==='cut-touch'&&(p.touchCooldown||0)>preCooldown+.04){actualCutTouches++;cutNormalX+=preNx;cutNormalY+=preNy;minCutNy=Math.min(minCutNy,preNy);maxCutNy=Math.max(maxCutNy,preNy);}
+    const afterContacts=p.carryState?.cutContacts||0;
+    if(afterContacts>beforeContacts){actualCutTouches+=afterContacts-beforeContacts;cutNormalX+=preNx;cutNormalY+=preNy;minCutNy=Math.min(minCutNy,preNy);maxCutNy=Math.max(maxCutNy,preNy);}
     phases[phase]=(phases[phase]||0)+1;
     const gap=Math.hypot(engine.ball.x-p.x,engine.ball.y-p.y);maxGap=Math.max(maxGap,gap);if(gap>36)lost++;
     const s=p.carryState;
-    if((phase==='turn'||phase==='cut-touch')&&s?.turnBaseDir){
+    if((phase==='cut-setup'||phase==='cut-approach'||phase==='cut-hit')&&s?.turnBaseDir){
       const relX=engine.ball.x-p.x,relY=engine.ball.y-p.y,sideX=-s.turnBaseDir.y*(s.turnSide||1),sideY=s.turnBaseDir.x*(s.turnSide||1);
       const base=relX*s.turnBaseDir.x+relY*s.turnBaseDir.y,side=relX*sideX+relY*sideY;
       minTurnGap=Math.min(minTurnGap,gap);maxTurnSide=Math.max(maxTurnSide,side);minTurnSide=Math.min(minTurnSide,side);maxTurnBase=Math.max(maxTurnBase,base);minTurnBase=Math.min(minTurnBase,base);
