@@ -22,30 +22,34 @@ export function carryPlan(engine,p,intentTarget,dt=.016){
   if(!engine?.ball||!p||!intentTarget)return null;
   const ball=engine.ball,state=p.carryState||{},stats=carryStats(p),raw=unit(intentTarget.x-ball.x,intentTarget.y-ball.y),previousIntent=intentDir(p,raw),intentDelta=angle(previousIntent,raw),actualGap=dist(p,ball),physicalContact=(p.r||7.25)+(ball.r||4.35);
   const face=smoothFace(p,raw,dt),ballSpeed=mag(ball.vx||0,ball.vy||0),lead=catchLeadFrames(p,ball,physicalContact),future=predictedBall(ball,lead);
-
-  // The carrier never owns or steers the ball. To change lane, the player must first run around
-  // the free ball to the rear of the requested vector, then cross the collision circle again.
-  const rel={x:ball.x-p.x,y:ball.y-p.y},forward=dot(rel.x,rel.y,raw.x,raw.y),playerAround=actualGap>.01?unit(p.x-ball.x,p.y-ball.y):{x:-raw.x,y:-raw.y},behind={x:-raw.x,y:-raw.y},aroundError=angle(playerAround,behind),near=actualGap<=physicalContact+5.2,correctSide=Math.abs(aroundError)<.58,ballAhead=forward>physicalContact*.02;
-  const aligned=near&&correctSide&&ballAhead;
+  const rel={x:ball.x-p.x,y:ball.y-p.y},forward=dot(rel.x,rel.y,raw.x,raw.y),playerAround=actualGap>.01?unit(p.x-ball.x,p.y-ball.y):{x:-raw.x,y:-raw.y},behind={x:-raw.x,y:-raw.y},aroundError=angle(playerAround,behind),near=actualGap<=physicalContact+5.4,correctSide=Math.abs(aroundError)<.60,ballAhead=forward>physicalContact*.01;
+  const aligned=near&&correctSide&&ballAhead,touchAvailable=(p.touchCooldown||0)<=dt+1e-6;
   let moveTarget,phase;
-  if(aligned){
+  if(aligned&&touchAvailable){
     const stride=clamp(13+stats.pace*.055+ballSpeed*1.45,15,23);
     moveTarget={x:ball.x+raw.x*stride,y:ball.y+raw.y*stride};
     phase='touch';
+  }else if(aligned){
+    // A dribble impulse has a short physical cooldown. Do not run through the free ball while an
+    // impact cannot register; stay just outside the rear contact ring and prepare the next stride.
+    const holdBall=predictedBall(ball,Math.min(lead,.35)),radius=physicalContact+1.35;
+    moveTarget={x:holdBall.x-raw.x*radius,y:holdBall.y-raw.y*radius};
+    phase='ready';
   }else{
-    // Recovery belongs outside the contact ring. That prevents an accidental forward graze while
-    // the runner is still moving around the ball and makes the next collision normal meaningful.
+    // Recovery also stays outside the collision ring so the next registered touch is intentional.
     const radius=physicalContact+2.2;
     moveTarget={x:future.x-raw.x*radius,y:future.y-raw.y*radius};
     phase='recover';
   }
   const facingTarget={x:ball.x+face.x*95,y:ball.y+face.y*95};
-  return{moveTarget,facingTarget,dir:face,faceDir:face,intentDir:raw,turnBaseDir:previousIntent,turnSide:Math.sign(intentDelta)||state.turnSide||1,cutNormal:null,cutContacts:0,cutStage:'none',cutStageTicks:0,cutJustHit:false,turnTicks:0,phase,aligned,activeTurn:false,intentDelta,turnSharpness:Math.abs(intentDelta),actualGap,lead,aroundError};
+  return{moveTarget,facingTarget,dir:face,faceDir:face,intentDir:raw,turnBaseDir:previousIntent,turnSide:Math.sign(intentDelta)||state.turnSide||1,cutNormal:null,cutContacts:0,cutStage:'none',cutStageTicks:0,cutJustHit:false,turnTicks:0,phase,aligned,activeTurn:false,intentDelta,turnSharpness:Math.abs(intentDelta),actualGap,lead,aroundError,touchAvailable};
 }
 
-function steerCarryVelocity(p,target,dt){
+function steerCarryVelocity(p,target,dt,mode='recover'){
   const speed=mag(p.vx||0,p.vy||0);if(speed<.08)return;
-  const desired=unit(target.x-p.x,target.y-p.y),current=unit(p.vx,p.vy),delta=angle(current,desired),stats=carryStats(p),turnRate=4.9+stats.agility*.071,step=clamp(delta,-turnRate*dt,turnRate*dt),next=rotate(current,step),retention=clamp(.987+(stats.agility-50)*.00008,.984,.992);
+  const desired=unit(target.x-p.x,target.y-p.y),current=unit(p.vx,p.vy),delta=angle(current,desired),stats=carryStats(p);
+  const turnRate=mode==='touch'?6.8+stats.agility*.080:mode==='ready'?6.1+stats.agility*.074:5.2+stats.agility*.073;
+  const step=clamp(delta,-turnRate*dt,turnRate*dt),next=rotate(current,step),retention=mode==='ready'?.965:clamp(.987+(stats.agility-50)*.00008,.984,.992);
   p.vx=next.x*speed*retention;p.vy=next.y*speed*retention;
 }
 
@@ -58,9 +62,9 @@ MatchEngine.prototype.movePlayer=function continuousPhysicalCarry(p,target,dt,tr
   const plan=carryPlan(this,p,intended,dt);if(!plan)return previousMovePlayer.call(this,p,target,dt,track);
   const intent=p.dribbleIntent,oldX=intent.targetX,oldY=intent.targetY;intent.targetX=plan.facingTarget.x;intent.targetY=plan.facingTarget.y;
   p.carryState={...(p.carryState||{}),dir:plan.faceDir,intentDir:plan.intentDir,faceDir:plan.faceDir,turnBaseDir:plan.turnBaseDir,turnSide:plan.turnSide,cutNormal:null,cutContacts:0,cutStage:'none',cutStageTicks:0,cutJustHit:false,turnTicks:0,phase:plan.phase,aligned:plan.aligned,aroundError:plan.aroundError,lastTick:this.tick};
-  // Only player momentum is redirected here. Agility determines how quickly the running vector
-  // can bend toward the recovery path; the ball remains untouched until circle collision resolves.
-  if(plan.phase==='recover')steerCarryVelocity(p,plan.moveTarget,dt);
+  // Only player momentum changes here. The ball receives no movement until the engine resolves a
+  // real circle collision. Touch steering makes the runner actually cross the planned impact line.
+  steerCarryVelocity(p,plan.moveTarget,dt,plan.phase);
   const result=previousMovePlayer.call(this,p,plan.moveTarget,dt,track);if(p.dribbleIntent){p.dribbleIntent.targetX=oldX;p.dribbleIntent.targetY=oldY;}return result;
 };
 
