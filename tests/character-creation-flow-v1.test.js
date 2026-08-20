@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {createAllocationState,increaseFamily} from '../character-creation-v1.js';
 import {creationIdentitySeed,creationReadiness,previewCreatedPlayer,createCareerFromCharacter} from '../character-creation-flow-v1.js';
 
-function buy(state,family,times){let current=state;for(let i=0;i<times;i++){const result=increaseFamily(current,family);assert.equal(result.ok,true);current=result.state;}return current;}
-function completeCM(){let state=createAllocationState('CM');state=buy(state,'distribution',4);state=buy(state,'mentality',3);state=buy(state,'technique',2);state=buy(state,'athleticism',1);return state;}
+function buy(state,family,times){let current=state;for(let i=0;i<times;i++){const result=increaseFamily(current,family);assert.equal(result.ok,true,`${family} rank ${i+1}`);current=result.state;}return current;}
+function completeCM(){let state=createAllocationState('CM');state=buy(state,'distribution',4);state=buy(state,'mentality',3);state=buy(state,'technique',1);state=buy(state,'athleticism',1);return state;}
 
 test('creation identity is independent from the club selected later',()=>{
   const base={playerName:'Lautaro Test',nationality:'AR',position:'CM',build:'creator',age:17,entryLevel:'reserve',background:'local_academy'};
