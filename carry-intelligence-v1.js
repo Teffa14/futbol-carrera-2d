@@ -23,10 +23,9 @@ export function carryPlan(engine,p,intentTarget,dt=.016){
   const ball=engine.ball,state=p.carryState||{},stats=carryStats(p),raw=unit(intentTarget.x-ball.x,intentTarget.y-ball.y),previousIntent=intentDir(p,raw),intentDelta=angle(previousIntent,raw),actualGap=dist(p,ball),physicalContact=(p.r||7.25)+(ball.r||4.35);
   const face=smoothFace(p,raw,dt),ballSpeed=mag(ball.vx||0,ball.vy||0),lead=catchLeadFrames(p,ball,physicalContact),future=predictedBall(ball,lead);
 
-  // Direction changes use the same free-ball mechanics as straight carrying. The runner first
-  // reaches the rear side of the newly requested vector, then accelerates through the circle.
-  // There is no special impulse, attachment or steering applied to the ball.
-  const rel={x:ball.x-p.x,y:ball.y-p.y},forward=dot(rel.x,rel.y,raw.x,raw.y),playerAround=actualGap>.01?unit(p.x-ball.x,p.y-ball.y):{x:-raw.x,y:-raw.y},behind={x:-raw.x,y:-raw.y},aroundError=angle(playerAround,behind),near=actualGap<=physicalContact+4.2,correctSide=Math.abs(aroundError)<.47,ballAhead=forward>physicalContact*.05;
+  // The carrier never owns or steers the ball. To change lane, the player must first run around
+  // the free ball to the rear of the requested vector, then cross the collision circle again.
+  const rel={x:ball.x-p.x,y:ball.y-p.y},forward=dot(rel.x,rel.y,raw.x,raw.y),playerAround=actualGap>.01?unit(p.x-ball.x,p.y-ball.y):{x:-raw.x,y:-raw.y},behind={x:-raw.x,y:-raw.y},aroundError=angle(playerAround,behind),near=actualGap<=physicalContact+5.2,correctSide=Math.abs(aroundError)<.58,ballAhead=forward>physicalContact*.02;
   const aligned=near&&correctSide&&ballAhead;
   let moveTarget,phase;
   if(aligned){
@@ -34,12 +33,20 @@ export function carryPlan(engine,p,intentTarget,dt=.016){
     moveTarget={x:ball.x+raw.x*stride,y:ball.y+raw.y*stride};
     phase='touch';
   }else{
-    const radius=physicalContact-.9;
+    // Recovery belongs outside the contact ring. That prevents an accidental forward graze while
+    // the runner is still moving around the ball and makes the next collision normal meaningful.
+    const radius=physicalContact+2.2;
     moveTarget={x:future.x-raw.x*radius,y:future.y-raw.y*radius};
     phase='recover';
   }
   const facingTarget={x:ball.x+face.x*95,y:ball.y+face.y*95};
-  return{moveTarget,facingTarget,dir:face,faceDir:face,intentDir:raw,turnBaseDir:previousIntent,turnSide:Math.sign(intentDelta)||state.turnSide||1,cutNormal:null,cutContacts:0,cutStage:'none',cutStageTicks:0,cutJustHit:false,turnTicks:0,phase,aligned,activeTurn:false,intentDelta,turnSharpness:Math.abs(intentDelta),actualGap,lead};
+  return{moveTarget,facingTarget,dir:face,faceDir:face,intentDir:raw,turnBaseDir:previousIntent,turnSide:Math.sign(intentDelta)||state.turnSide||1,cutNormal:null,cutContacts:0,cutStage:'none',cutStageTicks:0,cutJustHit:false,turnTicks:0,phase,aligned,activeTurn:false,intentDelta,turnSharpness:Math.abs(intentDelta),actualGap,lead,aroundError};
+}
+
+function steerCarryVelocity(p,target,dt){
+  const speed=mag(p.vx||0,p.vy||0);if(speed<.08)return;
+  const desired=unit(target.x-p.x,target.y-p.y),current=unit(p.vx,p.vy),delta=angle(current,desired),stats=carryStats(p),turnRate=4.9+stats.agility*.071,step=clamp(delta,-turnRate*dt,turnRate*dt),next=rotate(current,step),retention=clamp(.987+(stats.agility-50)*.00008,.984,.992);
+  p.vx=next.x*speed*retention;p.vy=next.y*speed*retention;
 }
 
 const previousMovePlayer=MatchEngine.prototype.movePlayer;
@@ -50,7 +57,10 @@ MatchEngine.prototype.movePlayer=function continuousPhysicalCarry(p,target,dt,tr
   const intended={x:p.dribbleIntent.targetX,y:p.dribbleIntent.targetY};if(!Number.isFinite(intended.x)||!Number.isFinite(intended.y))return previousMovePlayer.call(this,p,target,dt,track);
   const plan=carryPlan(this,p,intended,dt);if(!plan)return previousMovePlayer.call(this,p,target,dt,track);
   const intent=p.dribbleIntent,oldX=intent.targetX,oldY=intent.targetY;intent.targetX=plan.facingTarget.x;intent.targetY=plan.facingTarget.y;
-  p.carryState={...(p.carryState||{}),dir:plan.faceDir,intentDir:plan.intentDir,faceDir:plan.faceDir,turnBaseDir:plan.turnBaseDir,turnSide:plan.turnSide,cutNormal:null,cutContacts:0,cutStage:'none',cutStageTicks:0,cutJustHit:false,turnTicks:0,phase:plan.phase,aligned:plan.aligned,lastTick:this.tick};
+  p.carryState={...(p.carryState||{}),dir:plan.faceDir,intentDir:plan.intentDir,faceDir:plan.faceDir,turnBaseDir:plan.turnBaseDir,turnSide:plan.turnSide,cutNormal:null,cutContacts:0,cutStage:'none',cutStageTicks:0,cutJustHit:false,turnTicks:0,phase:plan.phase,aligned:plan.aligned,aroundError:plan.aroundError,lastTick:this.tick};
+  // Only player momentum is redirected here. Agility determines how quickly the running vector
+  // can bend toward the recovery path; the ball remains untouched until circle collision resolves.
+  if(plan.phase==='recover')steerCarryVelocity(p,plan.moveTarget,dt);
   const result=previousMovePlayer.call(this,p,plan.moveTarget,dt,track);if(p.dribbleIntent){p.dribbleIntent.targetX=oldX;p.dribbleIntent.targetY=oldY;}return result;
 };
 
@@ -60,4 +70,4 @@ MatchEngine.prototype.dribbleTouchPower=function continuousCarryTouch(p){
   const stats=carryStats(p),speed=mag(p.vx||0,p.vy||0),target=.16+speed*.105+(stats.control+stats.dribbling)*.00135;return clamp(Math.max(base*.82,target),.13,.62);
 };
 
-export const __carryIntelligenceV1={carryStats,intentDir,smoothFace,predictedBall,catchLeadFrames};
+export const __carryIntelligenceV1={carryStats,intentDir,smoothFace,predictedBall,catchLeadFrames,steerCarryVelocity};
