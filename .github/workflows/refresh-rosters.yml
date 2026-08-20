@@ -37,16 +37,36 @@ jobs:
           node-version: 22
       - name: Build current roster snapshot and enforce coverage
         run: node scripts/refresh-live-rosters.mjs
-      - name: Publish snapshot when data changed
+      - name: Commit verified snapshot and sync main
         if: github.event_name != 'pull_request'
         run: |
-          if git diff --quiet -- live-rosters.generated.js; then
-            echo "Roster snapshot is already current."
-            exit 0
-          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- live-rosters.generated.js
-          git commit -m "data: refresh current football rosters"
+          if git diff --quiet -- live-rosters.generated.js; then
+            echo "Roster snapshot is already current."
+          else
+            git add -- live-rosters.generated.js
+            git commit -m "data: refresh current football rosters"
+          fi
           git pull --rebase origin main
           git push origin HEAD:main
+          printf 'BUILD_SHA=%s\n' "$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      - name: Verify refreshed production build
+        if: github.event_name != 'pull_request'
+        run: |
+          npm install --no-audit --no-fund
+          npm run check
+          npm run build
+          npm test
+      - name: Publish refreshed production artifact
+        if: github.event_name != 'pull_request'
+        run: |
+          cp dist/index.html /tmp/career-eleven-index.html
+          git checkout --orphan production-roster-publish
+          git rm -rf .
+          git clean -fdx
+          cp /tmp/career-eleven-index.html index.html
+          printf '%s\n' "$BUILD_SHA" > BUILD_SHA
+          git add -- index.html BUILD_SHA
+          git commit -m "deploy: ${BUILD_SHA}"
+          git push --force origin HEAD:production
