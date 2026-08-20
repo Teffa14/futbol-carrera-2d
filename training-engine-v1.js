@@ -98,7 +98,8 @@ export class TrainingEngine{
     for(const a of this.allActors()){
       const dx=this.ball.x-a.x,dy=this.ball.y-a.y,d=Math.hypot(dx,dy)||.001,min=a.r+this.ball.r;if(d>=min)continue;
       const n={x:dx/d,y:dy/d},over=min-d+.2;this.ball.x+=n.x*over;this.ball.y+=n.y*over;
-      const forward=Math.max(0,a.vx*n.x+a.vy*n.y);if(forward>.025){const strength=a.role==='def'?.11:.16;this.ball.vx+=n.x*Math.max(.035,forward*strength);this.ball.vy+=n.y*Math.max(.035,forward*strength);}
+      const relativeNormal=(a.vx-this.ball.vx)*n.x+(a.vy-this.ball.vy)*n.y;
+      if(relativeNormal>.015){const transfer=a.role==='def'?.34:.62,impulse=Math.max(.045,relativeNormal*transfer);this.ball.vx+=n.x*impulse;this.ball.vy+=n.y*impulse;}
       if(this.ball.lastActor!==a){this.ball.lastActor=a;this.metrics.touches++;}
     }
   }
@@ -145,7 +146,7 @@ export class TrainingEngine{
     }
     if(kind==='cross'){
       const [near,far]=this.mates;this.move(near,{x:790,y:250},dt,1.04);this.move(far,{x:770,y:315},dt,1.02);this.defenders.forEach((d,i)=>this.defend(d,{x:700+i*45,y:285+i*30},dt));
-      if(!this.flags.cross){this.dribbleTo(this.player,{x:730,y:425},dt);if(this.player.x>610&&t>.38){const target=good?far:near;this.flags.cross=this.approachKick(this.player,{x:target.x+35,y:target.y},dt,5.7,'cross',1.02);}}
+      if(!this.flags.cross){this.dribbleTo(this.player,{x:730,y:425},dt);if(this.player.x>575&&t>.32){const target=good?far:near;this.flags.cross=this.approachKick(this.player,{x:target.x+35,y:target.y},dt,5.7,'cross',1.02);}}
       else{this.move(near,this.projectedIntercept(near),dt);this.move(far,this.projectedIntercept(far),dt);}return;
     }
     if(kind==='finish'){
