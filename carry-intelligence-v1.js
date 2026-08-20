@@ -30,14 +30,13 @@ export function carryPlan(engine,p,intentTarget,dt=.016){
   let phase,moveTarget,aligned=false,nextTurnTicks=turnTicks;
   if(activeTurn){
     const rel={x:ball.x-p.x,y:ball.y-p.y},baseAhead=dot(rel.x,rel.y,turnBaseDir.x,turnBaseDir.y),sideAhead=dot(rel.x,rel.y,sideDir.x,sideDir.y);
-    // Collision resolution happens after movement. Waiting until the pre-move position has a
-    // large lateral offset creates an impossible one-frame gap. Once the first diagonal entry
-    // is reached, keep the player committed for a short sequence of physical contacts instead
-    // of re-evaluating himself back into recovery after each individual touch.
-    const committedCut=state.phase==='cut-touch'&&turnTicks>0;
-    const ready=committedCut||(actualGap<=physicalContact+6.2&&baseAhead>physicalContact*.28&&sideAhead>-physicalContact*.07);
+    // Each cut touch must start from the correct side of the ball. After running through it,
+    // the carrier can end up beyond that side; the next frame therefore returns to the shallow
+    // rear-side setup before another physical cut. The turn window stays alive for the whole
+    // sequence instead of being truncated by the first touch.
+    const ready=actualGap<=physicalContact+6.2&&baseAhead>physicalContact*.28&&sideAhead>-physicalContact*.07;
     if(ready){
-      aligned=true;phase='cut-touch';nextTurnTicks=committedCut?turnTicks:Math.min(turnTicks,12);const stride=clamp(13+stats.pace*.05+ballSpeed*.95,14.5,20.5);moveTarget={x:ball.x+cutNormal.x*stride,y:ball.y+cutNormal.y*stride};
+      aligned=true;phase='cut-touch';nextTurnTicks=turnTicks;const stride=clamp(13+stats.pace*.05+ballSpeed*.95,14.5,20.5);moveTarget={x:ball.x+cutNormal.x*stride,y:ball.y+cutNormal.y*stride};
     }else{
       phase='turn';
       const targetBall=predictedBall(ball,Math.min(lead,2.2)),rear=physicalContact*.82,side=physicalContact*.27;
