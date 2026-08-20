@@ -31,7 +31,7 @@ const previousExecuteKick=MatchEngine.prototype.executeKick;
 MatchEngine.prototype.executeKick=function contextualSpinContact(p,contactNormal){
   const intent=p?.kickIntent?{...p.kickIntent,openPlaySpin:p.kickIntent.openPlaySpin?{...p.kickIntent.openPlaySpin}:null}:null,result=previousExecuteKick.call(this,p,contactNormal);if(!result||!intent)return result;
   if(intent.openPlaySpin){this.ball.spin=intent.openPlaySpin.spin;this.ball.spinKind=intent.openPlaySpin.kind;this.ball.spinTechnique=intent.openPlaySpin.technique;p.lastOpenPlaySpin=intent.openPlaySpin;}
-  if(intent.type==='pass'){this.ball.flightKind=intent.passKind||'pass';this.ball.flightStartedTick=this.tick;this.ball.flightAttackingTeam=p.team;this.ball.flightReceiverId=intent.receiverId||null;}
+  if(intent.type==='pass'){this.ball.flightKind=intent.passKind||intent.trainingKind||'pass';this.ball.flightStartedTick=this.tick;this.ball.flightAttackingTeam=p.team;this.ball.flightReceiverId=intent.receiverId||null;}
   if(intent.type==='shot'){this.ball.flightKind='shot';this.ball.flightStartedTick=this.tick;this.ball.flightAttackingTeam=p.team;this.ball.flightReceiverId=null;}
   return result;
 };
