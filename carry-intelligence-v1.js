@@ -21,18 +21,27 @@ function catchLeadFrames(p,ball,physicalContact){const stats=carryStats(p),gap=M
 export function carryPlan(engine,p,intentTarget,dt=.016){
   if(!engine?.ball||!p||!intentTarget)return null;
   const ball=engine.ball,state=p.carryState||{},stats=carryStats(p),raw=unit(intentTarget.x-ball.x,intentTarget.y-ball.y),previousIntent=intentDir(p,raw),intentDelta=angle(previousIntent,raw),actualGap=dist(p,ball),physicalContact=(p.r||7.25)+(ball.r||4.35),newTurn=Math.abs(intentDelta)>.28&&actualGap<34;
-  const turnBaseDir=newTurn?previousIntent:(state.turnBaseDir||previousIntent),turnSide=newTurn?(Math.sign(intentDelta)||1):(state.turnSide||1),sideDir=rotate(turnBaseDir,turnSide*Math.PI/2),cutNormal=unit(turnBaseDir.x*.42+sideDir.x*.91,turnBaseDir.y*.42+sideDir.y*.91),turnTicks=newTurn?24:Math.max(0,(state.turnTicks||0)-1),activeTurn=turnTicks>0,face=smoothFace(p,raw,dt),ballSpeed=mag(ball.vx||0,ball.vy||0),lead=catchLeadFrames(p,ball,physicalContact),future=predictedBall(ball,lead);
+  const turnBaseDir=newTurn?previousIntent:(state.turnBaseDir||previousIntent),turnSide=newTurn?(Math.sign(intentDelta)||1):(state.turnSide||1),sideDir=rotate(turnBaseDir,turnSide*Math.PI/2);
+  // The carrier does not need to orbit to the exact rear quarter. A football cut is reachable
+  // from a shallow rear-side setup: stay behind the rolling ball, gain several pixels on the
+  // opposite side, then run through it diagonally. The collision normal turns the free ball.
+  const cutNormal=unit(turnBaseDir.x*.72+sideDir.x*.70,turnBaseDir.y*.72+sideDir.y*.70),turnTicks=newTurn?42:Math.max(0,(state.turnTicks||0)-1),activeTurn=turnTicks>0,face=smoothFace(p,raw,dt),ballSpeed=mag(ball.vx||0,ball.vy||0),lead=catchLeadFrames(p,ball,physicalContact),future=predictedBall(ball,lead);
 
   let phase,moveTarget,aligned=false,nextTurnTicks=turnTicks;
   if(activeTurn){
-    const rel={x:ball.x-p.x,y:ball.y-p.y},cutPerp={x:-cutNormal.y,y:cutNormal.x},forward=dot(rel.x,rel.y,cutNormal.x,cutNormal.y),lateral=dot(rel.x,rel.y,cutPerp.x,cutPerp.y),playerAround=actualGap>.01?unit(p.x-ball.x,p.y-ball.y):{x:-cutNormal.x,y:-cutNormal.y},desiredRear={x:-cutNormal.x,y:-cutNormal.y},rearError=angle(playerAround,desiredRear),ready=actualGap<=physicalContact+4.2&&Math.abs(rearError)<.48&&forward>physicalContact*.03&&Math.abs(lateral)<physicalContact*.82;
+    const rel={x:ball.x-p.x,y:ball.y-p.y},baseAhead=dot(rel.x,rel.y,turnBaseDir.x,turnBaseDir.y),sideAhead=dot(rel.x,rel.y,sideDir.x,sideDir.y);
+    // For a turn toward sideDir the ball must be a little to that side of the player's centre.
+    // This produces an actual diagonal contact without requiring an unrealistic orbit.
+    const ready=actualGap<=physicalContact+4.8&&baseAhead>physicalContact*.22&&sideAhead>Math.max(2.4,physicalContact*.18);
     if(ready){
-      aligned=true;phase='cut-touch';nextTurnTicks=Math.min(turnTicks,8);const stride=clamp(12+stats.pace*.045+ballSpeed*.85,13,19);moveTarget={x:ball.x+cutNormal.x*stride,y:ball.y+cutNormal.y*stride};
+      aligned=true;phase='cut-touch';nextTurnTicks=Math.min(turnTicks,10);const stride=clamp(12.5+stats.pace*.045+ballSpeed*.9,14,19.5);moveTarget={x:ball.x+cutNormal.x*stride,y:ball.y+cutNormal.y*stride};
     }else{
-      phase='turn';const targetBall=predictedBall(ball,Math.min(lead,3.2)),rearRadius=physicalContact-1.0;moveTarget={x:targetBall.x-cutNormal.x*rearRadius,y:targetBall.y-cutNormal.y*rearRadius};
+      phase='turn';
+      const targetBall=predictedBall(ball,Math.min(lead,2.6)),rear=physicalContact*.84,side=physicalContact*.38;
+      moveTarget={x:targetBall.x-turnBaseDir.x*rear-sideDir.x*side,y:targetBall.y-turnBaseDir.y*rear-sideDir.y*side};
     }
   }else{
-    const rel={x:ball.x-p.x,y:ball.y-p.y},perp={x:-raw.y,y:raw.x},forward=dot(rel.x,rel.y,raw.x,raw.y),lateral=dot(rel.x,rel.y,perp.x,perp.y),playerAround=actualGap>.01?unit(p.x-ball.x,p.y-ball.y):{x:-raw.x,y:-raw.y},behind={x:-raw.x,y:-raw.y},aroundError=angle(playerAround,behind),near=actualGap<=physicalContact+4.2,correctSide=Math.abs(aroundError)<.47,ballAhead=forward>physicalContact*.05;
+    const rel={x:ball.x-p.x,y:ball.y-p.y},perp={x:-raw.y,y:raw.x},forward=dot(rel.x,rel.y,raw.x,raw.y),playerAround=actualGap>.01?unit(p.x-ball.x,p.y-ball.y):{x:-raw.x,y:-raw.y},behind={x:-raw.x,y:-raw.y},aroundError=angle(playerAround,behind),near=actualGap<=physicalContact+4.2,correctSide=Math.abs(aroundError)<.47,ballAhead=forward>physicalContact*.05;
     aligned=near&&correctSide&&ballAhead;
     if(aligned){const stride=clamp(13+stats.pace*.055+ballSpeed*1.45,15,23);moveTarget={x:ball.x+raw.x*stride,y:ball.y+raw.y*stride};phase='touch';}
     else{const radius=physicalContact-.9;moveTarget={x:future.x-raw.x*radius,y:future.y-raw.y*radius};phase='recover';}
@@ -43,7 +52,7 @@ export function carryPlan(engine,p,intentTarget,dt=.016){
 
 function steerTurnVelocity(p,target,dt){
   const speed=mag(p.vx||0,p.vy||0);if(speed<.12)return;
-  const stats=carryStats(p),desired=unit(target.x-p.x,target.y-p.y),current=unit(p.vx,p.vy),delta=angle(current,desired),rate=5.0+stats.agility*.062,step=clamp(delta,-rate*dt,rate*dt),next=rotate(current,step),retain=clamp(.95+(stats.agility-50)*.0003,.942,.966);p.vx=next.x*speed*retain;p.vy=next.y*speed*retain;
+  const stats=carryStats(p),desired=unit(target.x-p.x,target.y-p.y),current=unit(p.vx,p.vy),delta=angle(current,desired),rate=5.4+stats.agility*.068,step=clamp(delta,-rate*dt,rate*dt),next=rotate(current,step),retain=clamp(.95+(stats.agility-50)*.0003,.942,.966);p.vx=next.x*speed*retain;p.vy=next.y*speed*retain;
 }
 
 const previousMovePlayer=MatchEngine.prototype.movePlayer;
@@ -55,14 +64,14 @@ MatchEngine.prototype.movePlayer=function continuousPhysicalCarry(p,target,dt,tr
   const plan=carryPlan(this,p,intended,dt);if(!plan)return previousMovePlayer.call(this,p,target,dt,track);
   const intent=p.dribbleIntent,oldX=intent.targetX,oldY=intent.targetY;intent.targetX=plan.facingTarget.x;intent.targetY=plan.facingTarget.y;
   p.carryState={...(p.carryState||{}),dir:plan.faceDir,intentDir:plan.intentDir,faceDir:plan.faceDir,turnBaseDir:plan.turnBaseDir,turnSide:plan.turnSide,cutNormal:plan.cutNormal,turnTicks:plan.turnTicks,phase:plan.phase,aligned:plan.aligned,lastTick:this.tick};
-  if(plan.phase==='turn')steerTurnVelocity(p,plan.moveTarget,dt);
+  if(plan.phase==='turn'||plan.phase==='cut-touch')steerTurnVelocity(p,plan.moveTarget,dt);
   const result=previousMovePlayer.call(this,p,plan.moveTarget,dt,track);if(p.dribbleIntent){p.dribbleIntent.targetX=oldX;p.dribbleIntent.targetY=oldY;}return result;
 };
 
 MatchEngine.prototype.dribbleTouchPower=function continuousCarryTouch(p){
   const base=previousDribbleTouchPower.call(this,p),state=p?.carryState;
-  if(state?.phase==='turn')return Math.min(base,.035);
-  if(state?.phase==='cut-touch'){const stats=carryStats(p),speed=mag(p.vx||0,p.vy||0);return clamp(.20+speed*.10+(stats.control+stats.dribbling)*.0011,.22,.54);}
+  if(state?.phase==='turn')return Math.min(base,.03);
+  if(state?.phase==='cut-touch'){const stats=carryStats(p),speed=mag(p.vx||0,p.vy||0);return clamp(.24+speed*.115+(stats.control+stats.dribbling)*.00125,.28,.60);}
   if(state?.phase!=='touch')return base;
   const stats=carryStats(p),speed=mag(p.vx||0,p.vy||0),target=.16+speed*.105+(stats.control+stats.dribbling)*.00135;return clamp(Math.max(base*.82,target),.13,.62);
 };
