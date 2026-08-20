@@ -37,5 +37,5 @@ test('a B career cannot keep Newells or any Primera club in its league schedule'
 });
 
 test('potrero UI removes lime SaaS chips and keeps training pitch plus scores plus commentary in one grid',()=>{
-  const css=fs.readFileSync(new URL('../potrero-ui-v2.js',import.meta.url),'utf8'),index=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');assert.equal(css.includes('#d8ff4c'),false);assert.match(css,/\.pill,.pc-pill,.session-pill,.training-engine-pill/);assert.match(css,/border-radius:0!important/);assert.match(css,/grid-template-areas:\"head head\" \"progress meta\" \"stage report\" \"stage status\"/);assert.ok(index.indexOf("./potrero-ui-v2.js")>index.indexOf("./precareer-entry-ui-v2.js"));
+  const css=fs.readFileSync(new URL('../potrero-ui-v2.js',import.meta.url),'utf8'),index=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');assert.equal(css.includes('#d8ff4c'),false);assert.match(css,/\.pill,.pc-pill,.session-pill,.training-engine-pill/);assert.match(css,/border-radius:0!important/);assert.match(css,/grid-template-areas:\"head head\" \"progress meta\" \"stage report\" \"stage status\" \"stage comments\"/);assert.match(css,/RELATO DEL ENTRENAMIENTO/);assert.match(css,/training-commentary/);assert.ok(index.indexOf("./potrero-ui-v2.js")>index.indexOf("./precareer-entry-ui-v2.js"));
 });
