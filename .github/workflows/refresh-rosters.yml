@@ -1,0 +1,45 @@
+name: Refresh live football rosters
+
+on:
+  schedule:
+    - cron: '23 5 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - scripts/refresh-live-rosters.mjs
+      - division-b-data-v1.js
+      - division-b-register-v1.js
+      - .github/workflows/refresh-rosters.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: live-roster-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build current roster snapshot
+        run: node scripts/refresh-live-rosters.mjs
+      - name: Publish snapshot when data changed
+        run: |
+          if git diff --quiet -- live-rosters.generated.js; then
+            echo "Roster snapshot is already current."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- live-rosters.generated.js
+          git commit -m "data: refresh current football rosters"
+          git pull --rebase origin main
+          git push origin HEAD:main
