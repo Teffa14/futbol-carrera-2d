@@ -30,10 +30,12 @@ test('trial matches cannot be recorded before required drills',()=>{
 test('trial evidence weighs more than drills in scouting profile',()=>{
   let state=createPreCareerState({player:player()});
   for(const id of ['control','passing','finishing'])state=recordPreCareerDrill(state,drill(id,40));
+  const drillsOnly=buildScoutingProfile(state);
   state=recordTrialMatch(state,trial('trial-1',80));
   const profile=buildScoutingProfile(state);
-  assert.ok(profile.technical>60,'trial match should pull technical score above midpoint');
-  assert.ok(profile.tactical>profile.physical);
+  assert.equal(drillsOnly.technical,40);
+  assert.equal(profile.technical,64,'40% drill + 60% trial evidence should produce 64');
+  assert.ok(profile.technical-drillsOnly.technical>80-profile.technical,'trial score should exert the larger pull');
 });
 
 test('two trial matches complete assessment and unlock offers stage',()=>{
