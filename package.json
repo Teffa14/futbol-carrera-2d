@@ -1,10 +1,10 @@
 {
   "name":"career-eleven-2d",
-  "version":"0.7.1",
+  "version":"0.8.0",
   "private":true,
   "type":"module",
   "scripts":{
-    "check":"node --check app.js && node --check data.js && node --check career-development.js && node --check career.js && node --check tactics.js && node --check contacts.js && node --check duels.js && node --check engine.js && node --check kick-direction.js && node --check match-presentation.js && node --check ball-priority.js && node --check anti-cluster.js && node --check positional-ai.js && node --check boundary-intelligence.js && node --check role-depth.js && node --check kit-contrast.js && node --check football-rules-v2.js && node --check locomotion-v2.js && node --check agent-brain-v2.js && node --check passing-intelligence-v2.js && node --check striker-intelligence-v3.js",
+    "check":"node --check app.js && node --check data.js && node --check career-development.js && node --check career.js && node --check tactics.js && node --check contacts.js && node --check duels.js && node --check engine.js && node --check kick-direction.js && node --check match-presentation.js && node --check ball-priority.js && node --check anti-cluster.js && node --check positional-ai.js && node --check boundary-intelligence.js && node --check role-depth.js && node --check kit-contrast.js && node --check football-rules-v2.js && node --check locomotion-v2.js && node --check agent-brain-v2.js && node --check passing-intelligence-v2.js && node --check striker-intelligence-v3.js && node --check training-memory-v1.js && node --check training-engine-v1.js && node --check campaign-events-v1.js && node --check coach-adjustments-v1.js && node --check combination-play-v1.js && node --check career-experience-ui-v1.js",
     "test":"node --test tests/*.test.js"
   }
 }
