@@ -22,40 +22,48 @@ export function carryPlan(engine,p,intentTarget,dt=.016){
   if(!engine?.ball||!p||!intentTarget)return null;
   const ball=engine.ball,state=p.carryState||{},stats=carryStats(p),raw=unit(intentTarget.x-ball.x,intentTarget.y-ball.y),previousIntent=intentDir(p,raw),intentDelta=angle(previousIntent,raw),actualGap=dist(p,ball),physicalContact=(p.r||7.25)+(ball.r||4.35),newTurn=Math.abs(intentDelta)>.28&&actualGap<34;
   const turnBaseDir=newTurn?previousIntent:(state.turnBaseDir||previousIntent),turnSide=newTurn?(Math.sign(intentDelta)||1):(state.turnSide||1),sideDir=rotate(turnBaseDir,turnSide*Math.PI/2);
-  // A sharp cut is a sequence of real contacts. Between contacts the runner recovers to a
-  // reachable rear-side point, then attacks through the ball on a diagonal. The ball is never
-  // attached or steered directly; the circle-contact normal creates every change of direction.
-  const cutNormal=unit(turnBaseDir.x*.54+sideDir.x*.90,turnBaseDir.y*.54+sideDir.y*.90),turnTicks=newTurn?48:Math.max(0,(state.turnTicks||0)-1),activeTurn=turnTicks>0,face=smoothFace(p,raw,dt),ballSpeed=mag(ball.vx||0,ball.vy||0),lead=catchLeadFrames(p,ball,physicalContact),future=predictedBall(ball,lead);
+  // Desired collision normal. For a turn the player must physically arrive on the opposite
+  // rear-side of the free ball. The resolver then supplies the ball impulse along this normal.
+  const cutNormal=unit(turnBaseDir.x*.50+sideDir.x*.87,turnBaseDir.y*.50+sideDir.y*.87);
+  const inheritedContacts=newTurn?0:(state.cutContacts||0),turnTicks=newTurn?72:Math.max(0,(state.turnTicks||0)-1),completedCuts=inheritedContacts>=2,activeTurn=!completedCuts&&turnTicks>0;
+  const face=smoothFace(p,raw,dt),ballSpeed=mag(ball.vx||0,ball.vy||0),lead=catchLeadFrames(p,ball,physicalContact),future=predictedBall(ball,lead);
 
-  let phase,moveTarget,aligned=false,nextTurnTicks=turnTicks;
+  let phase,moveTarget,aligned=false,nextTurnTicks=turnTicks,cutStage=newTurn?'setup':(state.cutStage||'setup');
   if(activeTurn){
-    const rel={x:ball.x-p.x,y:ball.y-p.y},baseAhead=dot(rel.x,rel.y,turnBaseDir.x,turnBaseDir.y),sideAhead=dot(rel.x,rel.y,sideDir.x,sideDir.y);
-    // movePlayer reduces touchCooldown before collision resolution. Only attack through the ball
-    // when that reduction will make the next physical contact eligible for a real dribble impulse.
-    const touchAvailable=(p.touchCooldown||0)<=dt+1e-6;
-    const ready=touchAvailable&&actualGap<=physicalContact+7.5&&baseAhead>physicalContact*.20&&sideAhead>physicalContact*.10;
-    if(ready){
-      aligned=true;phase='cut-touch';nextTurnTicks=turnTicks;const stride=clamp(13.5+stats.pace*.052+ballSpeed,15,21.5);moveTarget={x:ball.x+cutNormal.x*stride,y:ball.y+cutNormal.y*stride};
+    const setupRadius=physicalContact+2.7,impactRadius=Math.max(physicalContact-1.6,physicalContact*.86);
+    const setupTarget={x:ball.x-cutNormal.x*setupRadius,y:ball.y-cutNormal.y*setupRadius};
+    const impactTarget={x:ball.x-cutNormal.x*impactRadius,y:ball.y-cutNormal.y*impactRadius};
+    const setupError=dist(p,setupTarget),touchAvailable=(p.touchCooldown||0)<=dt+1e-6;
+
+    // A confirmed hit always sends the next frame back to setup. This prevents the player from
+    // crossing to the wrong side and applying cancelling contacts while the ball is still free.
+    if(state.cutJustHit){cutStage='setup';}
+    if(cutStage==='strike'&&!touchAvailable)cutStage='setup';
+    if(cutStage==='setup'&&touchAvailable&&setupError<=7.2)cutStage='strike';
+
+    if(cutStage==='strike'){
+      phase='cut-approach';aligned=true;moveTarget=impactTarget;
     }else{
-      phase='turn';
-      // Do not chase several frames ahead while re-arming the cut. During the real touch
-      // cooldown the runner uses those frames to recover the correct side of the current ball.
-      const targetBall=predictedBall(ball,Math.min(lead,.8)),rear=physicalContact*.70,side=physicalContact*.52;
-      moveTarget={x:targetBall.x-turnBaseDir.x*rear-sideDir.x*side,y:targetBall.y-turnBaseDir.y*rear-sideDir.y*side};
+      phase='cut-setup';
+      // Use very little future-ball prediction here. The purpose is to gain the exact physical
+      // side of the current ball, not to chase a moving waypoint that can never be reached.
+      const targetBall=predictedBall(ball,Math.min(lead,.55));
+      moveTarget={x:targetBall.x-cutNormal.x*setupRadius,y:targetBall.y-cutNormal.y*setupRadius};
     }
   }else{
+    nextTurnTicks=0;cutStage='setup';
     const rel={x:ball.x-p.x,y:ball.y-p.y},forward=dot(rel.x,rel.y,raw.x,raw.y),playerAround=actualGap>.01?unit(p.x-ball.x,p.y-ball.y):{x:-raw.x,y:-raw.y},behind={x:-raw.x,y:-raw.y},aroundError=angle(playerAround,behind),near=actualGap<=physicalContact+4.2,correctSide=Math.abs(aroundError)<.47,ballAhead=forward>physicalContact*.05;
     aligned=near&&correctSide&&ballAhead;
     if(aligned){const stride=clamp(13+stats.pace*.055+ballSpeed*1.45,15,23);moveTarget={x:ball.x+raw.x*stride,y:ball.y+raw.y*stride};phase='touch';}
     else{const radius=physicalContact-.9;moveTarget={x:future.x-raw.x*radius,y:future.y-raw.y*radius};phase='recover';}
   }
   const facingTarget={x:ball.x+face.x*95,y:ball.y+face.y*95};
-  return{moveTarget,facingTarget,dir:face,faceDir:face,intentDir:raw,turnBaseDir,turnSide,cutNormal,turnTicks:nextTurnTicks,phase,aligned,activeTurn,intentDelta,turnSharpness:Math.abs(intentDelta),actualGap,lead};
+  return{moveTarget,facingTarget,dir:face,faceDir:face,intentDir:raw,turnBaseDir,turnSide,cutNormal,cutContacts:inheritedContacts,cutStage,cutJustHit:false,turnTicks:nextTurnTicks,phase,aligned,activeTurn,intentDelta,turnSharpness:Math.abs(intentDelta),actualGap,lead};
 }
 
 function steerTurnVelocity(p,target,dt){
   const speed=mag(p.vx||0,p.vy||0);if(speed<.12)return;
-  const stats=carryStats(p),desired=unit(target.x-p.x,target.y-p.y),current=unit(p.vx,p.vy),delta=angle(current,desired),rate=5.8+stats.agility*.074,step=clamp(delta,-rate*dt,rate*dt),next=rotate(current,step),retain=clamp(.949+(stats.agility-50)*.0003,.941,.966);p.vx=next.x*speed*retain;p.vy=next.y*speed*retain;
+  const stats=carryStats(p),desired=unit(target.x-p.x,target.y-p.y),current=unit(p.vx,p.vy),delta=angle(current,desired),rate=6.2+stats.agility*.078,step=clamp(delta,-rate*dt,rate*dt),next=rotate(current,step),retain=clamp(.948+(stats.agility-50)*.0003,.940,.965);p.vx=next.x*speed*retain;p.vy=next.y*speed*retain;
 }
 
 const previousMovePlayer=MatchEngine.prototype.movePlayer;
@@ -67,29 +75,35 @@ MatchEngine.prototype.movePlayer=function continuousPhysicalCarry(p,target,dt,tr
   const intended={x:p.dribbleIntent.targetX,y:p.dribbleIntent.targetY};if(!Number.isFinite(intended.x)||!Number.isFinite(intended.y))return previousMovePlayer.call(this,p,target,dt,track);
   const plan=carryPlan(this,p,intended,dt);if(!plan)return previousMovePlayer.call(this,p,target,dt,track);
   const intent=p.dribbleIntent,oldX=intent.targetX,oldY=intent.targetY;intent.targetX=plan.facingTarget.x;intent.targetY=plan.facingTarget.y;
-  p.carryState={...(p.carryState||{}),dir:plan.faceDir,intentDir:plan.intentDir,faceDir:plan.faceDir,turnBaseDir:plan.turnBaseDir,turnSide:plan.turnSide,cutNormal:plan.cutNormal,turnTicks:plan.turnTicks,phase:plan.phase,aligned:plan.aligned,lastTick:this.tick};
-  if(plan.phase==='turn'||plan.phase==='cut-touch')steerTurnVelocity(p,plan.moveTarget,dt);
+  p.carryState={...(p.carryState||{}),dir:plan.faceDir,intentDir:plan.intentDir,faceDir:plan.faceDir,turnBaseDir:plan.turnBaseDir,turnSide:plan.turnSide,cutNormal:plan.cutNormal,cutContacts:plan.cutContacts,cutStage:plan.cutStage,cutJustHit:plan.cutJustHit,turnTicks:plan.turnTicks,phase:plan.phase,aligned:plan.aligned,lastTick:this.tick};
+  if(plan.phase==='cut-setup'||plan.phase==='cut-approach')steerTurnVelocity(p,plan.moveTarget,dt);
   const result=previousMovePlayer.call(this,p,plan.moveTarget,dt,track);if(p.dribbleIntent){p.dribbleIntent.targetX=oldX;p.dribbleIntent.targetY=oldY;}return result;
 };
 
-// A setup graze can overlap the ball physically, but it is not an intentional dribble touch.
-// The base resolver consumes touchCooldown for every dribble overlap. Suppress only that zero-
-// power setup impulse for one resolver call, then restore the naturally expired cooldown so the
-// next correctly positioned cut can fire. Ball overlap/rebound physics still execute normally.
+// Setup grazes may overlap because both objects are physical. They must still resolve overlap and
+// rebound, but must not consume a dribble touch. A cut only advances when the base resolver proves
+// that an eligible cut-approach collision actually applied an impulse by raising touchCooldown.
 MatchEngine.prototype.resolveBallPlayerCollisions=function carryAwareBallCollisionResolution(){
-  const suppressed=[];
+  const suppressed=[],strikeBefore=[];
   for(const p of this.players||[]){
-    if(p?.dribbleIntent&&p?.carryState?.phase==='turn'&&(p.touchCooldown||0)<=0){suppressed.push(p);p.touchCooldown=Number.EPSILON;}
+    const phase=p?.carryState?.phase;
+    if(p?.dribbleIntent&&phase==='cut-setup'&&(p.touchCooldown||0)<=0){suppressed.push(p);p.touchCooldown=Number.EPSILON;}
+    if(p?.dribbleIntent&&phase==='cut-approach')strikeBefore.push([p,p.touchCooldown||0]);
   }
   const result=previousResolveBallPlayerCollisions.call(this);
   for(const p of suppressed){if(p.touchCooldown===Number.EPSILON)p.touchCooldown=0;}
+  for(const [p,before] of strikeBefore){
+    if((p.touchCooldown||0)>before+.04){
+      p.carryState={...(p.carryState||{}),cutContacts:(p.carryState?.cutContacts||0)+1,cutStage:'setup',cutJustHit:true,phase:'cut-hit'};
+    }
+  }
   return result;
 };
 
 MatchEngine.prototype.dribbleTouchPower=function continuousCarryTouch(p){
   const base=previousDribbleTouchPower.call(this,p),state=p?.carryState;
-  if(state?.phase==='turn')return 0;
-  if(state?.phase==='cut-touch'){const stats=carryStats(p),speed=mag(p.vx||0,p.vy||0);return clamp(.29+speed*.125+(stats.control+stats.dribbling)*.00135,.32,.66);}
+  if(state?.phase==='cut-setup')return 0;
+  if(state?.phase==='cut-approach'){const stats=carryStats(p),speed=mag(p.vx||0,p.vy||0);return clamp(.30+speed*.13+(stats.control+stats.dribbling)*.0014,.34,.68);}
   if(state?.phase!=='touch')return base;
   const stats=carryStats(p),speed=mag(p.vx||0,p.vy||0),target=.16+speed*.105+(stats.control+stats.dribbling)*.00135;return clamp(Math.max(base*.82,target),.13,.62);
 };
