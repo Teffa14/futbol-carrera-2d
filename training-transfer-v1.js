@@ -1,4 +1,5 @@
 import {TrainingMatchEngine} from './training-match-engine-v1.js';
+import {bestAttackingSpace,crossTrajectoryTarget} from './collective-space-play-v1.js';
 
 const FIELD={left:55,right:1045,top:45,bottom:655,goalTop:295,goalBottom:405,centerX:550,centerY:350};
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -24,8 +25,6 @@ function markGoal(engine){
   if(!q.goal){q.goal=true;m.goals++;engine.flashTraining('GOL');}q.repSuccess=true;return true;
 }
 
-// A training rep is one continuous physical effort. Reposition actors between reps,
-// but do not erase fatigue: stamina now matters inside the session too.
 const originalResetActor=TrainingMatchEngine.prototype.resetActor;
 TrainingMatchEngine.prototype.resetActor=function preserveTrainingFatigue(p,x,y,role=null){
   const fatigue=Number(p?.fatigue)||0,out=originalResetActor.call(this,p,x,y,role);if(p)p.fatigue=fatigue;return out;
@@ -36,7 +35,6 @@ TrainingMatchEngine.prototype.move=function staminaTrackedTrainingMove(p,target,
   this._moved.add(p.id);this.movePlayer(p,target,dt,true);
 };
 
-// Passes and crosses should have football weight, not a generic full-power clearance.
 const originalTryKick=TrainingMatchEngine.prototype.tryKick;
 TrainingMatchEngine.prototype.tryKick=function weightedTrainingKick(p,target,power,kind='pass',receiver=null,dt=.016){
   let adjusted=power;
@@ -53,8 +51,6 @@ const originalScenario=TrainingMatchEngine.prototype.scenario;
 TrainingMatchEngine.prototype.scenario=function transferableTrainingScenario(dt){
   const k=this.drill?.kind,q=this.trainingQualityV6,m=this.trainingMetricsV6;
 
-  // Use the exact match skill-move mechanic. A successful duel creates the same burstTimer
-  // and therefore the same acceleration that a 1v1 produces during an 11v11 match.
   if(k==='1v1'){
     const defender=this.defenders[0];
     if(defender&&q.branch&&!q.skillMoveAttempted&&dist(this.player,defender)<70){
@@ -65,8 +61,6 @@ TrainingMatchEngine.prototype.scenario=function transferableTrainingScenario(dt)
     return;
   }
 
-  // The v8 small-sided drill uses full match AI. Keep that, but a rep only counts when
-  // the advantage is converted into a real shot/goal instead of merely crossing an x threshold.
   if(k==='2v2'||k==='3v3'){
     originalScenario.call(this,dt);
     if(markGoal(this))return;
@@ -78,8 +72,6 @@ TrainingMatchEngine.prototype.scenario=function transferableTrainingScenario(dt)
     return;
   }
 
-  // Before delegating to the finishing scenario, arm the first-time shot while the pass is
-  // still travelling. executeKick then uses shooting + ballControl + composure on contact.
   if(k==='finish'&&q.service&&q.pendingPass&&!q.finishShot&&!q.firstTimeArmed){
     const speed=Math.hypot(this.ball.vx,this.ball.vy),contact=this.player.r+this.ball.r+23;
     if(speed>.9&&dist(this.player,this.ball)<contact){
@@ -93,18 +85,11 @@ TrainingMatchEngine.prototype.scenario=function transferableTrainingScenario(dt)
 
   if(k==='cross'){
     const [near,far,cutback]=this.mates;if(!near||!far||!cutback)return;
-    const progress=clamp((this.ball.x-620)/215,0,1);
     if(!q.delivered){
-      this.move(near,{x:760+progress*135,y:FIELD.goalTop+28},dt);
-      this.move(far,{x:770+progress*145,y:FIELD.goalBottom-28},dt);
-      this.move(cutback,{x:725+progress*105,y:FIELD.centerY+105},dt);
+      for(const mate of this.mates)this.move(mate,bestAttackingSpace(this,mate,this.player),dt);
     }else if(q.pendingPass){
-      const receiver=this.mates.find(p=>p.id===q.pendingPass.to);
-      for(const mate of this.mates){
-        if(mate===receiver)continue;
-        const side=mate===near?-1:mate===far?1:0;
-        this.move(mate,{x:mate===cutback?FIELD.right-190:FIELD.right-105,y:side?FIELD.centerY+side*48:FIELD.centerY+100},dt);
-      }
+      for(const mate of this.mates){const trajectory=crossTrajectoryTarget(this,mate)||this.projectedIntercept(mate);this.move(mate,trajectory,dt);}
+      q.phase='Atacar la trayectoria del centro';
     }
   }
 };
