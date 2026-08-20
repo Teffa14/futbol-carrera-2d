@@ -63,7 +63,7 @@ const previousResolveBallPlayerCollisions=MatchEngine.prototype.resolveBallPlaye
 MatchEngine.prototype.movePlayer=function continuousPhysicalCarry(p,target,dt,track){
   if(!p?.dribbleIntent||p.kickIntent||!this.ball)return previousMovePlayer.call(this,p,target,dt,track);
   const intended={x:p.dribbleIntent.targetX,y:p.dribbleIntent.targetY};if(!Number.isFinite(intended.x)||!Number.isFinite(intended.y))return previousMovePlayer.call(this,p,target,dt,track);
-  const plan=carryPlan(this,p,intended,dt);if(!plan)return previousMovePlayer.call(this,p,intended,dt,track);
+  const plan=carryPlan(this,p,intended,dt);if(!plan)return previousMovePlayer.call(this,p,target,dt,track);
   const intent=p.dribbleIntent,oldX=intent.targetX,oldY=intent.targetY;intent.targetX=plan.facingTarget.x;intent.targetY=plan.facingTarget.y;
   p.carryState={...(p.carryState||{}),dir:plan.faceDir,intentDir:plan.intentDir,faceDir:plan.faceDir,turnDir:plan.turnDir,carryDir:plan.carryDir,turnBaseDir:plan.turnBaseDir,turnSide:plan.turnSide,turnAssistTicks:plan.turnAssistTicks,turnAssist:plan.turnAssist,turnTouches:plan.turnTouches,phase:plan.phase,aligned:plan.aligned,aroundError:plan.aroundError,lastTick:this.tick};
   plantCarryTurn(p,plan.moveTarget,Math.abs(plan.intentDelta));
