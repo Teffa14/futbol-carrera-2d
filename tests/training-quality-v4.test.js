@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import {DRILLS} from '../training-memory-v1.js';
 import {TrainingEngine} from '../training-engine-v1.js';
 import '../training-physics-fix-v2.js';
-import '../training-quality-v4.js';
+import '../training-drills-v5.js';
 
 const player={name:'Alex',pace:82,shooting:80,passing:82,dribbling:84,defense:66,physical:74,ballControl:84,vision:83,stamina:82,composure:82};
-function run(id,reps=6){const drill=DRILLS.find(d=>d.id===id);assert.ok(drill,`missing drill ${id}`);const result={drillId:id,quality:86,grade:'A',reps,successes:0,seed:`quality-v4-${id}`},e=new TrainingEngine(drill,result,player),phases=new Set();for(let i=0;i<12000&&!e.finished;i++){e.step(.016);if(e.trainingQualityV4?.phase)phases.add(e.trainingQualityV4.phase);}assert.equal(e.finished,true,`${id} did not finish`);const final=e.sessionResult();assert.equal(final.reps,reps);assert.equal(final.repResults.length,reps,`${id} did not score every repetition`);assert.ok(final.successes>=0&&final.successes<=reps);assert.ok(phases.size>=2,`${id} never changed training phase`);assert.ok(e.trainingQualityV4.objective.length>10,`${id} has no meaningful visible objective`);return{e,final,phases,m:e.trainingMetricsV4};}
+function run(id,reps=6){const drill=DRILLS.find(d=>d.id===id);assert.ok(drill,`missing drill ${id}`);const result={drillId:id,quality:86,grade:'A',reps,successes:0,seed:`quality-v5-${id}`},e=new TrainingEngine(drill,result,player),phases=new Set();for(let i=0;i<12000&&!e.finished;i++){e.step(.016);if(e.trainingQualityV5?.phase)phases.add(e.trainingQualityV5.phase);}assert.equal(e.finished,true,`${id} did not finish`);const final=e.sessionResult();assert.equal(final.reps,reps);assert.equal(final.repResults.length,reps,`${id} did not score every repetition`);assert.ok(final.successes>=0&&final.successes<=reps);assert.ok(phases.size>=2,`${id} never changed training phase`);assert.ok(e.trainingQualityV5.objective.length>10,`${id} has no meaningful visible objective`);return{e,final,phases,m:e.trainingMetricsV5};}
 
 test('cone drill is gate-based close-control work rather than a timer animation',()=>{const {m}=run('cone-dribble',4);assert.ok(m.gatesCleared>=8,`only ${m.gatesCleared} gates were physically cleared`);});
 
