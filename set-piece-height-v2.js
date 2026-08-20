@@ -1,0 +1,40 @@
+import {MatchEngine} from './engine.js';
+import {TrainingMatchEngine} from './training-match-engine-v1.js';
+import {FIELD} from './football-rules-v2.js';
+
+export const WALL_DISTANCE_PX=86;
+export const CROSSBAR_HEIGHT=6.2;
+export const WALL_CLEAR_HEIGHT=3.15;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const dist=(a,b)=>Math.hypot((a?.x??0)-(b?.x??0),(a?.y??0)-(b?.y??0));
+const unit=(x,y)=>{const d=Math.hypot(x,y)||1;return{x:x/d,y:y/d};};
+
+export function wallPositions(ball,target,count=3){
+  const d=unit(target.x-ball.x,target.y-ball.y),perp={x:-d.y,y:d.x},center={x:ball.x+d.x*WALL_DISTANCE_PX,y:ball.y+d.y*WALL_DISTANCE_PX},spacing=17.5,offset=(count-1)/2;return Array.from({length:count},(_,i)=>({x:center.x+perp.x*(i-offset)*spacing,y:center.y+perp.y*(i-offset)*spacing}));
+}
+
+export function freeKickTarget(engine,p){
+  const keeper=engine.players.find(o=>o.team!==p.team&&o.role==='GK'),goalX=p.team===0?FIELD.right+28:FIELD.left-28,corners=[FIELD.goalTop+20,FIELD.goalBottom-20],keeperY=keeper?.y??FIELD.centerY,far=Math.abs(keeperY-corners[0])>Math.abs(keeperY-corners[1])?corners[0]:corners[1],ballSide=Math.sign(engine.ball.y-FIELD.centerY)||1,targetY=Math.abs(keeperY-FIELD.centerY)<16?(ballSide>0?corners[0]:corners[1]):far;return{x:goalX,y:targetY};
+}
+
+export function aerialFreeKickPlan(engine,p,target){
+  const shooting=Number(p.data?.shooting??65),control=Number(p.data?.ballControl??65),composure=Number(p.data?.composure??65),technique=clamp(shooting*.50+control*.25+composure*.25,35,99),dir=unit(target.x-engine.ball.x,target.y-engine.ball.y),side=target.y<engine.ball.y?-1:1,wall=wallPositions(engine.ball,target,4),ys=wall.map(w=>w.y),outsideY=side<0?Math.min(...ys)-22:Math.max(...ys)+22,dxWall=Math.max(40,Math.abs(wall[0].x-engine.ball.x)),dxTarget=Math.max(dxWall+90,Math.abs(target.x-engine.ball.x)),initialAimY=clamp(engine.ball.y+(outsideY-engine.ball.y)*(dxTarget/dxWall),FIELD.top+22,FIELD.bottom-22),spin=-side*clamp(.64+(technique-55)*.008,.50,1.05),distance=Math.hypot(target.x-engine.ball.x,target.y-engine.ball.y),launchVz=clamp(.455+(distance<270?.025:0)+(technique-60)*.0008,.44,.54);return{targetX:target.x,targetY:target.y,initialAim:{x:target.x,y:initialAimY},side,spin,technique,wallX:wall[0].x,outsideY,launchVz,startX:engine.ball.x,startY:engine.ball.y,shotDir:dir};
+}
+
+const previousExecuteKick=MatchEngine.prototype.executeKick;
+MatchEngine.prototype.executeKick=function aerialSetPieceContact(p,contactNormal){const aerial=p?.kickIntent?.aerialPlan?{...p.kickIntent.aerialPlan}:null,result=previousExecuteKick.call(this,p,contactNormal);if(result&&aerial){this.ball.z=.25;this.ball.vz=aerial.launchVz;this.ball.setPieceAerial={startX:aerial.startX,startY:aerial.startY,dirX:aerial.shotDir.x,dirY:aerial.shotDir.y,startedTick:this.tick};}return result;};
+
+const previousResolve=MatchEngine.prototype.resolveBallPlayerCollisions;
+MatchEngine.prototype.resolveBallPlayerCollisions=function wallHeightAwareContacts(){const flight=this.ball?.setPieceAerial;if(flight){const travelled=(this.ball.x-flight.startX)*flight.dirX+(this.ball.y-flight.startY)*flight.dirY;if(travelled>=0&&travelled<128&&(this.ball.z||0)>WALL_CLEAR_HEIGHT)return;}return previousResolve.call(this);};
+
+const previousCheckGoal=MatchEngine.prototype.checkGoal;
+MatchEngine.prototype.checkGoal=function crossbarAwareGoal(){
+  const mouth=this.ball.y>FIELD.goalTop&&this.ball.y<FIELD.goalBottom,left=this.ball.x<FIELD.left-9,right=this.ball.x>FIELD.right+9;if(mouth&&(left||right)&&(this.ball.z||0)>CROSSBAR_HEIGHT){if(!this.ball.crossbarMissLogged){this.pushEvent('La pelota pasa por arriba del travesaño',this.ball.lastTeam,'shot');this.ball.crossbarMissLogged=true;}if(right){this.ball.x=FIELD.right-2;this.ball.vx=-Math.abs(this.ball.vx)*.24;}else{this.ball.x=FIELD.left+2;this.ball.vx=Math.abs(this.ball.vx)*.24;}this.ball.vz=-Math.abs(this.ball.vz||0)*.18;return;}const result=previousCheckGoal.call(this);if(!mouth||(!left&&!right))this.ball.crossbarMissLogged=false;return result;};
+
+const previousReset=TrainingMatchEngine.prototype.resetRep;
+TrainingMatchEngine.prototype.resetRep=function realisticFreeKickReset(rep,initial=false){const out=previousReset.call(this,rep,initial);if(this.drill?.kind!=='free-kick')return out;this.repLength=7.6;this.duration=this.repLength*Math.max(1,this.result?.reps||1);this.repStart=rep*this.repLength;const bx=[765,785,800][rep%3],by=[270,350,430][rep%3];this.resetBall(bx,by);const target=freeKickTarget(this,this.player),d=unit(target.x-bx,target.y-by),contact=this.player.r+this.ball.r+8;this.resetActor(this.player,bx-d.x*contact,by-d.y*contact,'CAM');const count=rep%3===2?4:3,wall=wallPositions(this.ball,target,count);for(let i=0;i<4;i++){const defender=this.defenders[i];if(!defender)continue;const pos=wall[Math.min(i,count-1)];this.resetActor(defender,pos.x+(i>=count?d.x*34:0),pos.y+(i>=count?d.y*34:0),'CB');}const keeper=this.defenders[4];if(keeper)this.resetActor(keeper,FIELD.right-27,rep%2?FIELD.centerY-20:FIELD.centerY+20,'GK');this.trainingQualityV6.objective='Perfilate, elegí un costado de la barrera y combiná altura con rosca sin pasar el travesaño';this.trainingQualityV6.freeKickPlan=null;this.repOrigin={px:this.player.x,py:this.player.y,bx:this.ball.x,by:this.ball.y};return out;};
+
+const previousScenario=TrainingMatchEngine.prototype.scenario;
+TrainingMatchEngine.prototype.scenario=function aerialFreeKickScenario(dt){if(this.drill?.kind!=='free-kick')return previousScenario.call(this,dt);const q=this.trainingQualityV6,m=this.trainingMetricsV6,keeper=this.defenders[4];q.phase='Perfil, altura y rosca';if(this.goalScored()&&(this.ball.z||0)<=CROSSBAR_HEIGHT){if(!q.goal){q.goal=true;q.repSuccess=true;m.goals++;this.flashTraining('GOL');}return;}if(!q.freeKickPlan)q.freeKickPlan=aerialFreeKickPlan(this,this.player,freeKickTarget(this,this.player));const plan=q.freeKickPlan;if(!q.finishShot&&!this.player.kickIntent)this.armKick(this.player,plan.initialAim,7.45,'shot',{trainingKind:'free-kick',curvePlan:plan,aerialPlan:plan});if(!q.finishShot){const aim=unit(plan.initialAim.x-this.ball.x,plan.initialAim.y-this.ball.y),spot={x:this.ball.x-aim.x*(this.player.r+this.ball.r-.5),y:this.ball.y-aim.y*(this.player.r+this.ball.r-.5)};this.move(this.player,spot,dt);if(this.lastTrainingKick?.rep===this.rep&&this.lastTrainingKick.by===this.player.id&&this.lastTrainingKick.kind==='free-kick')q.finishShot=true;}if(keeper)this.move(keeper,this.aiTarget(keeper,[],this.ballActor(1),0),dt);};
+
+export const __setPieceHeightV2={wallPositions,freeKickTarget,aerialFreeKickPlan};
