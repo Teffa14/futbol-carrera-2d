@@ -6,7 +6,9 @@ import {MatchEngine} from '../engine.js';
 function build(seed='duel-runtime'){
   const state=createCareer({playerName:'Test',nationality:'AR',position:'CM',build:'creator',countryId:'AR',clubId:'river'});
   const fixture=nextFixture(state);
-  return new MatchEngine(lineup11(state,fixture.home),lineup11(state,fixture.away),{
+  const home=lineup11(state,fixture.home,{forceUser:fixture.home===state.clubId});
+  const away=lineup11(state,fixture.away,{forceUser:fixture.away===state.clubId});
+  return new MatchEngine(home,away,{
     homeName:fixture.home,
     awayName:fixture.away,
     homeTactics:state.world[fixture.home].tactics,

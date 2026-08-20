@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {COUNTRIES} from '../data.js';
-import {createCareer,makeRoundRobin,nextFixture,lineup11,trainAttribute,unlockSkill,asyncLineup,recordAsyncResult} from '../career.js';
+import {createCareer,makeRoundRobin,nextFixture,lineup11,matchdaySelection,completeCareerMatch,trainAttribute,unlockSkill,asyncLineup,recordAsyncResult} from '../career.js';
 import {MatchEngine} from '../engine.js';
 
 test('all leagues create 11-player lineups and valid double round robin',()=>{
@@ -17,12 +17,49 @@ test('all leagues create 11-player lineups and valid double round robin',()=>{
   }
 });
 
-test('created career has no personal default name and user is in starting eleven',()=>{
+test('created career has no personal default name',()=>{
   const s=createCareer({playerName:'',nationality:'AR',position:'CAM',build:'technician',countryId:'AR',clubId:'river'});
   assert.equal(s.player.name,'Jugador');
-  assert.equal(lineup11(s,'river').some(p=>p.isUser),true);
   const app=fs.readFileSync(new URL('../app.js',import.meta.url),'utf8');
   assert.equal(app.includes('placeholder="Stefano"'),false);
+});
+
+test('coach-owned selection can leave a youth player outside the XI and promote him on merit',()=>{
+  const s=createCareer({playerName:'Prospect',nationality:'AR',position:'CM',build:'creator',countryId:'AR',clubId:'river'});
+  const roster=s.world[s.clubId].roster;
+  for(const p of roster){p.rating=p.isUser?30:90;p.fitness=100;p.form=0;}
+  let selection=matchdaySelection(s);
+  assert.equal(selection.starters.length,11);
+  assert.ok(selection.bench.length<=7);
+  assert.equal(selection.status,'reserve');
+  assert.equal(selection.starters.some(p=>p.isUser),false);
+  assert.equal(lineup11(s,s.clubId).some(p=>p.isUser),false);
+
+  for(const p of roster){if(!p.isUser)p.rating=50;}
+  s.player.rating=99;
+  selection=matchdaySelection(s);
+  assert.equal(selection.status,'starter');
+  assert.equal(lineup11(s,s.clubId).some(p=>p.isUser),true);
+});
+
+test('forceUser remains an explicit competitive-mode override',()=>{
+  const s=createCareer({playerName:'Prospect',nationality:'PT',position:'CM',build:'engine',countryId:'PT',clubId:'porto'});
+  for(const p of s.world[s.clubId].roster){p.rating=p.isUser?30:90;p.fitness=100;p.form=0;}
+  assert.equal(lineup11(s,s.clubId).some(p=>p.isUser),false);
+  assert.equal(lineup11(s,s.clubId,{forceUser:true}).some(p=>p.isUser),true);
+});
+
+test('a match without an appearance does not award appearance stats or performance XP',()=>{
+  const s=createCareer({playerName:'Prospect',nationality:'ES',position:'CM',build:'creator',countryId:'ES',clubId:'barcelona'});
+  for(const p of s.world[s.clubId].roster){p.rating=p.isUser?30:90;p.fitness=100;p.form=0;}
+  const fixture=nextFixture(s),beforeXp=s.progress.xp,beforeApps=s.seasonStats.apps;
+  const result=completeCareerMatch(s,fixture.id,{score:[1,0],userPerformance:null});
+  assert.equal(result.ok,true);
+  assert.equal(s.seasonStats.apps,beforeApps);
+  assert.equal(s.progress.xp,beforeXp);
+  assert.equal(s.history.at(-1).appeared,false);
+  assert.equal(s.history.at(-1).squadStatus,'reserve');
+  assert.equal(s.lastMatch.userPerformance,null);
 });
 
 test('new careers use the canonical youth development profile',()=>{
