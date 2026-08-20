@@ -22,24 +22,22 @@ export function carryPlan(engine,p,intentTarget,dt=.016){
   if(!engine?.ball||!p||!intentTarget)return null;
   const ball=engine.ball,state=p.carryState||{},stats=carryStats(p),raw=unit(intentTarget.x-ball.x,intentTarget.y-ball.y),previousIntent=intentDir(p,raw),intentDelta=angle(previousIntent,raw),actualGap=dist(p,ball),physicalContact=(p.r||7.25)+(ball.r||4.35),newTurn=Math.abs(intentDelta)>.28&&actualGap<34;
   const turnBaseDir=newTurn?previousIntent:(state.turnBaseDir||previousIntent),turnSide=newTurn?(Math.sign(intentDelta)||1):(state.turnSide||1),sideDir=rotate(turnBaseDir,turnSide*Math.PI/2);
-  // A sharp cut starts from a shallow rear-side entry. The player never orbits around an
-  // attached ball: he closes on the free ball and then runs through it diagonally so the
-  // actual circle-contact normal supplies the lateral change of direction.
-  const cutNormal=unit(turnBaseDir.x*.66+sideDir.x*.78,turnBaseDir.y*.66+sideDir.y*.78),turnTicks=newTurn?34:Math.max(0,(state.turnTicks||0)-1),activeTurn=turnTicks>0,face=smoothFace(p,raw,dt),ballSpeed=mag(ball.vx||0,ball.vy||0),lead=catchLeadFrames(p,ball,physicalContact),future=predictedBall(ball,lead);
+  // A sharp cut is a sequence of real contacts. Between contacts the runner recovers to a
+  // reachable rear-side point, then attacks through the ball on a diagonal. The ball is never
+  // attached or steered directly; the circle-contact normal creates every change of direction.
+  const cutNormal=unit(turnBaseDir.x*.54+sideDir.x*.90,turnBaseDir.y*.54+sideDir.y*.90),turnTicks=newTurn?48:Math.max(0,(state.turnTicks||0)-1),activeTurn=turnTicks>0,face=smoothFace(p,raw,dt),ballSpeed=mag(ball.vx||0,ball.vy||0),lead=catchLeadFrames(p,ball,physicalContact),future=predictedBall(ball,lead);
 
   let phase,moveTarget,aligned=false,nextTurnTicks=turnTicks;
   if(activeTurn){
     const rel={x:ball.x-p.x,y:ball.y-p.y},baseAhead=dot(rel.x,rel.y,turnBaseDir.x,turnBaseDir.y),sideAhead=dot(rel.x,rel.y,sideDir.x,sideDir.y);
-    // Each cut touch must start from the correct side of the ball. After running through it,
-    // the carrier can end up beyond that side; the next frame therefore returns to the shallow
-    // rear-side setup before another physical cut. The turn window stays alive for the whole
-    // sequence instead of being truncated by the first touch.
-    const ready=actualGap<=physicalContact+6.2&&baseAhead>physicalContact*.28&&sideAhead>-physicalContact*.07;
+    const ready=actualGap<=physicalContact+7.5&&baseAhead>physicalContact*.20&&sideAhead>physicalContact*.10;
     if(ready){
-      aligned=true;phase='cut-touch';nextTurnTicks=turnTicks;const stride=clamp(13+stats.pace*.05+ballSpeed*.95,14.5,20.5);moveTarget={x:ball.x+cutNormal.x*stride,y:ball.y+cutNormal.y*stride};
+      aligned=true;phase='cut-touch';nextTurnTicks=turnTicks;const stride=clamp(13.5+stats.pace*.052+ballSpeed,15,21.5);moveTarget={x:ball.x+cutNormal.x*stride,y:ball.y+cutNormal.y*stride};
     }else{
       phase='turn';
-      const targetBall=predictedBall(ball,Math.min(lead,2.2)),rear=physicalContact*.82,side=physicalContact*.27;
+      // Do not chase several frames ahead while re-arming the cut. The player must actually
+      // gain the correct lateral side of the current ball before the next diagonal contact.
+      const targetBall=predictedBall(ball,Math.min(lead,.8)),rear=physicalContact*.70,side=physicalContact*.52;
       moveTarget={x:targetBall.x-turnBaseDir.x*rear-sideDir.x*side,y:targetBall.y-turnBaseDir.y*rear-sideDir.y*side};
     }
   }else{
@@ -54,7 +52,7 @@ export function carryPlan(engine,p,intentTarget,dt=.016){
 
 function steerTurnVelocity(p,target,dt){
   const speed=mag(p.vx||0,p.vy||0);if(speed<.12)return;
-  const stats=carryStats(p),desired=unit(target.x-p.x,target.y-p.y),current=unit(p.vx,p.vy),delta=angle(current,desired),rate=5.5+stats.agility*.070,step=clamp(delta,-rate*dt,rate*dt),next=rotate(current,step),retain=clamp(.95+(stats.agility-50)*.0003,.942,.966);p.vx=next.x*speed*retain;p.vy=next.y*speed*retain;
+  const stats=carryStats(p),desired=unit(target.x-p.x,target.y-p.y),current=unit(p.vx,p.vy),delta=angle(current,desired),rate=5.8+stats.agility*.074,step=clamp(delta,-rate*dt,rate*dt),next=rotate(current,step),retain=clamp(.949+(stats.agility-50)*.0003,.941,.966);p.vx=next.x*speed*retain;p.vy=next.y*speed*retain;
 }
 
 const previousMovePlayer=MatchEngine.prototype.movePlayer;
@@ -73,7 +71,7 @@ MatchEngine.prototype.movePlayer=function continuousPhysicalCarry(p,target,dt,tr
 MatchEngine.prototype.dribbleTouchPower=function continuousCarryTouch(p){
   const base=previousDribbleTouchPower.call(this,p),state=p?.carryState;
   if(state?.phase==='turn')return Math.min(base,.03);
-  if(state?.phase==='cut-touch'){const stats=carryStats(p),speed=mag(p.vx||0,p.vy||0);return clamp(.27+speed*.12+(stats.control+stats.dribbling)*.0013,.30,.64);}
+  if(state?.phase==='cut-touch'){const stats=carryStats(p),speed=mag(p.vx||0,p.vy||0);return clamp(.29+speed*.125+(stats.control+stats.dribbling)*.00135,.32,.66);}
   if(state?.phase!=='touch')return base;
   const stats=carryStats(p),speed=mag(p.vx||0,p.vy||0),target=.16+speed*.105+(stats.control+stats.dribbling)*.00135;return clamp(Math.max(base*.82,target),.13,.62);
 };
