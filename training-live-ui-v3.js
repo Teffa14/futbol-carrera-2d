@@ -1,6 +1,5 @@
 import {loadCareer,saveCareer,calculateOverall} from './career.js';
 import {drillById,ensureTrainingMemory,previewTrainingResult,applyTrainingResult} from './training-memory-v1.js';
-import './training-physics-fix-v2.js';
 import {TrainingEngine} from './training-engine-v1.js';
 
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
