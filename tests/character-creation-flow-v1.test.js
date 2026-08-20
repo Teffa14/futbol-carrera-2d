@@ -8,7 +8,7 @@ function completeCM(){let state=createAllocationState('CM');state=buy(state,'dis
 
 test('creation identity is independent from the club selected later',()=>{
   const base={playerName:'Lautaro Test',nationality:'AR',position:'CM',build:'creator',age:17,entryLevel:'reserve',background:'local_academy'};
-  assert.equal(creationIdentitySeed({...base,clubId:'river'}),creationIdentitySeed({...base,clubId:'central'}));
+  assert.equal(creationIdentitySeed({...base,clubId:'river'}),creationIdentitySeed({...base,clubId:'rosario-central'}));
 });
 
 test('preview applies the exact correlated allocation to the stable youth profile',()=>{
@@ -39,6 +39,6 @@ test('same created footballer keeps his attributes when the eventual club change
   const allocation=completeCM();
   const common={playerName:'Lautaro Test',nationality:'AR',position:'CM',build:'creator',countryId:'AR',creationAllocation:allocation};
   const river=createCareerFromCharacter({...common,clubId:'river'}).player;
-  const central=createCareerFromCharacter({...common,clubId:'central'}).player;
+  const central=createCareerFromCharacter({...common,clubId:'rosario-central'}).player;
   for(const key of ['pace','shooting','passing','dribbling','defense','physical','ballControl','vision','stamina','composure','rating','potential'])assert.equal(river[key],central[key],key);
 });
