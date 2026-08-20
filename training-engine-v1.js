@@ -15,11 +15,12 @@ function profile(data={}){return{
   sprintSpeed:clamp((data.pace??70)*.87+(data.stamina??70)*.08+(data.physical??65)*.05,30,99),
   reaction:clamp((data.vision??65)*.32+(data.composure??65)*.28+(data.ballControl??65)*.22+(data.pace??70)*.18,30,99),
 };}
+function minimumRepLength(kind){return({cones:3.4,'1v1':3.4,'2v2':3.4,'3v3':4.0,through:3.0,cross:3.8,finish:3.0,'free-kick':2.8})[kind]||2.8;}
 
 export class TrainingEngine{
   constructor(drill,result,player){
     this.drill=drill;this.result=result;this.playerData=player;this.profile=profile(player);
-    this.time=0;this.rep=0;this.repStart=0;this.repLength=Math.max(2.8,(drill.duration||18)/Math.max(1,result.reps));
+    this.time=0;this.rep=0;this.repStart=0;this.repLength=Math.max(minimumRepLength(drill.kind),(drill.duration||18)/Math.max(1,result.reps));
     this.duration=this.repLength*Math.max(1,result.reps);this.finished=false;this.rng=rng(result.seed||drill.id);
     this.flash='';this.flashTimer=0;this.stage=0;this.flags={};
     this.player=actor(120,400,9,'user');this.ball={x:134,y:400,r:5,vx:0,vy:0,lastActor:null,lastKick:null};
@@ -48,7 +49,7 @@ export class TrainingEngine{
     }else if(kind==='through'){
       this.resetActor(this.player,185,350);Object.assign(this.ball,{x:201,y:350,vx:0,vy:0,lastActor:null,lastKick:null});this.mates=[actor(485,285,9,'runner')];this.defenders=[actor(500,225,10,'def'),actor(520,330,10,'def')];
     }else if(kind==='cross'){
-      this.resetActor(this.player,135,435);Object.assign(this.ball,{x:151,y:435,vx:0,vy:0,lastActor:null,lastKick:null});this.mates=[actor(690,225,9,'runner'),actor(745,300,9,'runner')];this.defenders=[actor(660,340,10,'def'),actor(720,270,10,'def')];
+      this.resetActor(this.player,470,435);Object.assign(this.ball,{x:486,y:435,vx:0,vy:0,lastActor:null,lastKick:null});this.mates=[actor(690,225,9,'runner'),actor(745,300,9,'runner')];this.defenders=[actor(660,340,10,'def'),actor(720,270,10,'def')];
     }else if(kind==='finish'){
       this.resetActor(this.player,515,315);Object.assign(this.ball,{x:335,y:410,vx:0,vy:0,lastActor:null,lastKick:null});this.mates=[actor(315,410,9,'server')];this.defenders=[actor(710,255,10,'def')];
     }else if(kind==='free-kick'){
@@ -146,8 +147,8 @@ export class TrainingEngine{
     }
     if(kind==='cross'){
       const [near,far]=this.mates;this.move(near,{x:790,y:250},dt,1.04);this.move(far,{x:770,y:315},dt,1.02);this.defenders.forEach((d,i)=>this.defend(d,{x:700+i*45,y:285+i*30},dt));
-      if(!this.flags.cross){this.dribbleTo(this.player,{x:730,y:425},dt);if(this.player.x>575&&t>.32){const target=good?far:near;this.flags.cross=this.approachKick(this.player,{x:target.x+35,y:target.y},dt,5.7,'cross',1.02);}}
-      else{this.move(near,this.projectedIntercept(near),dt);this.move(far,this.projectedIntercept(far),dt);}return;
+      if(!this.flags.cross){this.dribbleTo(this.player,{x:680,y:425},dt);if(this.player.x>545&&t>.22){const target=good?far:near;this.flags.cross=this.approachKick(this.player,{x:target.x+35,y:target.y},dt,5.7,'cross',1.04);}}
+      else{this.move(this.player,{x:735,y:425},dt,1.03);this.move(near,this.projectedIntercept(near),dt);this.move(far,this.projectedIntercept(far),dt);}return;
     }
     if(kind==='finish'){
       const server=this.mates[0],def=this.defenders[0];this.defend(def,{x:720,y:270},dt,.92);
