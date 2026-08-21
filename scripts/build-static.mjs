@@ -49,6 +49,18 @@ if(/(?:src|href)=["']\.\/(?:app|styles|character-creation|public-landing)\./i.te
 if(html.includes('raw.githubusercontent.com'))throw new Error('Production page must not fetch executable modules from GitHub');
 if(!html.includes('<meta name="career-build" content="self-contained">'))throw new Error('Production page lost the stable loader compatibility marker');
 
+const forbiddenPublicSourceMarkers=[
+  'Teffa14/futbol-carrera-2d',
+  'github.com/Teffa14',
+  'raw.githubusercontent.com/Teffa14',
+  'api.github.com/repos/Teffa14'
+];
+for(const marker of forbiddenPublicSourceMarkers){
+  if(html.toLowerCase().includes(marker.toLowerCase())){
+    throw new Error(`Production page leaks private repository identifier: ${marker}`);
+  }
+}
+
 await rm(out,{recursive:true,force:true});
 await mkdir(out,{recursive:true});
 await writeFile(path.join(out,'index.html'),html,'utf8');

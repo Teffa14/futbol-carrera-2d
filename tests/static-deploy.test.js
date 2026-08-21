@@ -25,9 +25,12 @@ test('production page embeds styles and executable game code',()=>{
   assert.doesNotMatch(source,/type=["']module["']/i);
 });
 
-test('production page has no runtime GitHub module loader or missing core asset dependency',()=>{
+test('production page has no runtime GitHub loader, repository identity, or missing core asset dependency',()=>{
   const source=html();
-  assert.doesNotMatch(source,/raw\.githubusercontent\.com/);
+  assert.doesNotMatch(source,/raw\.githubusercontent\.com/i);
+  assert.doesNotMatch(source,/Teffa14\/futbol-carrera-2d/i);
+  assert.doesNotMatch(source,/github\.com\/Teffa14/i);
+  assert.doesNotMatch(source,/api\.github\.com\/repos\/Teffa14/i);
   assert.doesNotMatch(source,/createObjectURL\s*\(\s*new Blob/);
   assert.doesNotMatch(source,/(?:src|href)=["']\.\/(?:app|styles|character-creation)\./i);
   assert.doesNotMatch(source,/from\s+['"]\.\//);
