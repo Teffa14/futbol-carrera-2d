@@ -1,3 +1,5 @@
+import {developmentStage} from './career-development.js';
+
 const MS_DAY=24*60*60*1000;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
@@ -49,6 +51,12 @@ function syncPlayerAge(player,currentDate,index=0){
   if(!player.birthDate)player.birthDate=birthDateForAge(player.age??18,currentDate,{seed:playerKey(player,index)});
   player.age=ageOnDate(player.birthDate,currentDate);
 }
+function syncDevelopmentProfile(player){
+  if(!player?.developmentProfile)return;
+  player.developmentProfile.age=player.age;
+  player.developmentProfile.birthDate=player.birthDate;
+  player.developmentProfile.stage=developmentStage(player.age);
+}
 
 export function synchronizeCareerAges(state){
   const currentDate=state?.clock?.currentDate;
@@ -56,7 +64,7 @@ export function synchronizeCareerAges(state){
   let i=0;
   for(const club of Object.values(state.world||{}))for(const player of club.roster||[])syncPlayerAge(player,currentDate,i++);
   syncPlayerAge(state.player,currentDate,i);
-  if(state.player?.developmentProfile){state.player.developmentProfile.age=state.player.age;state.player.developmentProfile.birthDate=state.player.birthDate;}
+  syncDevelopmentProfile(state.player);
   return state;
 }
 
@@ -67,7 +75,7 @@ export function initializeCareerTime(state,{startDate=null}={}){
   let i=0;
   for(const club of Object.values(state.world||{}))for(const player of club.roster||[])anchorPlayerBirthDate(player,currentDate,i++);
   anchorPlayerBirthDate(state.player,currentDate,i);
-  if(state.player?.developmentProfile){state.player.developmentProfile.age=state.player.age;state.player.developmentProfile.birthDate=state.player.birthDate;}
+  syncDevelopmentProfile(state.player);
   return state.clock;
 }
 
