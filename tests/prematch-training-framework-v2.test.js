@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {ROLE_DRILLS,trainingCatalogFor,trainingFamily,recommendedTrainingDrills,trainingMarkerSnapshot} from '../training-framework-v2.js';
 import {TrainingMatchEngine,TRAINING_RUNTIME_VERSIONS} from '../training-runtime-latest.js';
-import {pitchLayout,roleText,topResponsibilities} from '../prematch-ui-v2.js';
+import {__prematchUiV2} from '../prematch-ui-v2.js';
 
+const {pitchLayout,roleText,topResponsibilities}=__prematchUiV2;
 const player=(position='ST')=>({name:'OUROS',position,engineRole:position,pace:55,shooting:54,passing:52,dribbling:56,defense:48,physical:55,ballControl:53,vision:51,stamina:57,composure:50,fitness:100,trainingMemory:{},developmentWork:{}});
 
 test('training v2 is role-specific instead of one generic drill grid',()=>{
