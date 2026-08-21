@@ -40,11 +40,12 @@ let html=sourceIndex
   .replace(/\s*<link[^>]+href=["']\.\/styles\.css["'][^>]*>/i,'')
   .replace(/\s*<link[^>]+href=["']\.\/character-creation\.css["'][^>]*>/i,'')
   .replace(moduleMatch[0],`<script>${safeJs}</script>`)
-  .replace('</head>',`<meta name="career-build" content="${buildId}"><style>${safeCss}</style></head>`);
+  .replace('</head>',`<meta name="career-build" content="self-contained"><meta name="career-build-id" content="${buildId}"><style>${safeCss}</style></head>`);
 
 if(/type=["']module["']/i.test(html))throw new Error('Production page still contains an unbundled module entrypoint');
 if(/(?:src|href)=["']\.\/(?:app|styles|character-creation)\./i.test(html))throw new Error('Production page still depends on separate core assets');
 if(html.includes('raw.githubusercontent.com'))throw new Error('Production page must not fetch executable modules from GitHub');
+if(!html.includes('<meta name="career-build" content="self-contained">'))throw new Error('Production page lost the stable loader compatibility marker');
 
 await rm(out,{recursive:true,force:true});
 await mkdir(out,{recursive:true});
