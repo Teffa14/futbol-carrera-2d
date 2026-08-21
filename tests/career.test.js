@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {COUNTRIES} from '../data.js';
 import {createCareer,makeRoundRobin,nextFixture,lineup11,matchdaySelection,completeCareerMatch,trainAttribute,unlockSkill,asyncLineup,recordAsyncResult} from '../career.js';
+import {ageOnDate,addDaysISO} from '../career-time-v1.js';
 import {MatchEngine} from '../engine.js';
 
 test('all leagues create 11-player lineups and valid double round robin',()=>{
@@ -62,11 +63,23 @@ test('a match without an appearance does not award appearance stats or performan
   assert.equal(s.lastMatch.userPerformance,null);
 });
 
+test('career matches advance the football calendar and preserve the played date',()=>{
+  const s=createCareer({playerName:'Calendar Test',nationality:'AR',position:'CM',build:'creator',countryId:'AR',clubId:'river'});
+  const fixture=nextFixture(s),playedOn=s.clock.currentDate;
+  const result=completeCareerMatch(s,fixture.id,{score:[0,0],userPerformance:null});
+  assert.equal(result.ok,true);
+  assert.equal(s.lastMatch.date,playedOn);
+  assert.equal(s.history.at(-1).date,playedOn);
+  assert.equal(s.clock.currentDate,addDaysISO(playedOn,7));
+  assert.equal(s.clock.elapsedDays,7);
+});
+
 test('new careers use the canonical youth development profile',()=>{
   const input={playerName:'Youth Test',nationality:'AR',position:'RW',build:'technician',countryId:'AR',clubId:'river'};
   const a=createCareer(input),b=createCareer(input);
   assert.equal(a.player.age,17);
-  assert.match(a.player.birthDate,/^2009-\d{2}-\d{2}$/);
+  assert.match(a.player.birthDate,/^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(ageOnDate(a.player.birthDate,a.clock.currentDate),17);
   assert.ok(a.player.rating<70,`expected youth OVR below 70, got ${a.player.rating}`);
   assert.equal(a.player.rating,a.player.developmentProfile.startingOverall);
   assert.equal(a.player.developmentProfile.entryLevel,'reserve');
