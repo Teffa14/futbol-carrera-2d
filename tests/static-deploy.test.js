@@ -9,10 +9,12 @@ const root=path.resolve(testsDir,'..');
 const dist=path.join(root,'dist');
 const html=()=>fs.readFileSync(path.join(dist,'index.html'),'utf8');
 
-test('production artifact is one self-contained HTML file with a content fingerprint',()=>{
+test('production artifact keeps the stable loader marker and a separate content fingerprint',()=>{
   assert.ok(fs.existsSync(path.join(dist,'index.html')),'dist/index.html must exist');
   assert.deepEqual(fs.readdirSync(dist).sort(),['index.html']);
-  assert.match(html(),/<meta name="career-build" content="[a-f0-9]{12}">/);
+  const source=html();
+  assert.match(source,/<meta name="career-build" content="self-contained">/);
+  assert.match(source,/<meta name="career-build-id" content="[a-f0-9]{12}">/);
 });
 
 test('production page embeds styles and executable game code',()=>{
