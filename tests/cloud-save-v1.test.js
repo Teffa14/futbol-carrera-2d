@@ -38,20 +38,29 @@ test('cloud save observes the existing local save without replacing Storage meth
   assert.doesNotMatch(cloud,/Storage\.prototype\.removeItem\s*=/);
 });
 
-test('recovery secret is hashed server-side and the table is not directly exposed',()=>{
+test('recovery secret is hashed server-side and RLS checks that secret on every table operation',()=>{
   assert.match(migration,/secret_hash bytea not null/i);
   assert.match(migration,/digest\(convert_to\(p_secret,'UTF8'\),'sha256'\)/i);
   assert.match(migration,/enable row level security/i);
-  assert.match(migration,/revoke all on table public\.career_saves from anon, authenticated/i);
+  assert.match(migration,/current_setting\('app\.career_secret', true\)/i);
+  assert.match(migration,/career_saves_select_recovery_key/i);
+  assert.match(migration,/career_saves_insert_recovery_key/i);
+  assert.match(migration,/career_saves_update_recovery_key/i);
+  assert.match(migration,/career_saves_delete_recovery_key/i);
   assert.doesNotMatch(migration,/user_id/i);
   assert.doesNotMatch(migration,/auth\.uid\(\)/i);
 });
 
-test('only guarded RPC functions are executable by browser roles',()=>{
-  assert.match(migration,/security definer/ig);
-  assert.match(migration,/grant execute on function public\.career_save_write[\s\S]*to anon, authenticated/i);
-  assert.match(migration,/grant execute on function public\.career_save_read[\s\S]*to anon, authenticated/i);
-  assert.match(migration,/grant execute on function public\.career_save_delete[\s\S]*to anon, authenticated/i);
+test('browser RPCs run with caller privileges instead of SECURITY DEFINER elevation',()=>{
+  assert.match(migration,/security invoker/ig);
+  assert.doesNotMatch(migration,/security definer/i);
+  assert.match(migration,/set_config\('app\.career_secret',p_secret,true\)/i);
+  assert.match(migration,/grant select, insert, update, delete on table public\.career_saves to anon/i);
+  assert.match(migration,/revoke all on table public\.career_saves from authenticated/i);
+  assert.match(migration,/grant execute on function public\.career_save_write[\s\S]*to anon/i);
+  assert.match(migration,/grant execute on function public\.career_save_read[\s\S]*to anon/i);
+  assert.match(migration,/grant execute on function public\.career_save_delete[\s\S]*to anon/i);
+  assert.match(migration,/revoke all on function public\.career_save_write[\s\S]*from authenticated/i);
   assert.match(migration,/pg_column_size\(p_save_data\) > 5242880/i);
 });
 
