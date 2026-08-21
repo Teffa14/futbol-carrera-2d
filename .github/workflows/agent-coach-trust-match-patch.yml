@@ -1,0 +1,126 @@
+name: Apply Coach Trust match lifecycle slice
+
+on:
+  push:
+    branches:
+      - feature/coach-trust-match-lifecycle-v1
+    paths:
+      - .github/workflows/agent-coach-trust-match-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-test-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/coach-trust-match-lifecycle-v1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Apply exact lifecycle patch
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs=require('node:fs');
+          const path='career.js';
+          let s=fs.readFileSync(path,'utf8');
+          const replaceOnce=(from,to,label)=>{
+            const first=s.indexOf(from);
+            if(first<0)throw new Error(`Missing patch anchor: ${label}`);
+            if(s.indexOf(from,first+1)>=0)throw new Error(`Non-unique patch anchor: ${label}`);
+            s=s.slice(0,first)+to+s.slice(first+from.length);
+          };
+
+          replaceOnce(
+            "import {initializeCareerTime,advanceCareerDays,rollCareerToSeasonStart} from './career-time-v1.js';",
+            "import {initializeCareerTime,advanceCareerDays,rollCareerToSeasonStart} from './career-time-v1.js';\nimport {ensureCareerAuthority,applyCoachTrustToCareer} from './career-authority-v1.js';",
+            'authority import'
+          );
+
+          replaceOnce(
+            "settings:{camera:'player',speed:1}};initializeCareerTime(state);return state;}",
+            "settings:{camera:'player',speed:1}};initializeCareerTime(state);ensureCareerAuthority(state);return state;}",
+            'new career authority initialization'
+          );
+
+          const oldMatch="  const perf=report.userPerformance??null;if(perf)applyPerformance(state,perf);state.lastMatch={fixtureId,date:matchDate,score:[...score],opponent:f.home===state.clubId?f.away:f.home,userPerformance:perf,squadStatus:selection.status};state.history.push({season:state.season,week:state.week,date:matchDate,score:[...score],appeared:Boolean(perf),squadStatus:selection.status,rating:perf?.rating??null,goals:perf?.goals||0,assists:perf?.assists||0});recoverWorld(state);";
+          const newMatch="  const perf=report.userPerformance??null;if(perf)applyPerformance(state,perf);const coachAssessment=applyCoachTrustToCareer(state,{fixtureId,date:matchDate,matchRating:perf?.rating??6,tacticalRating:perf?.ratingBreakdown?.tactical??6,errorCost:Math.max(0,-Number(perf?.ratingBreakdown?.errors||0)),appeared:Boolean(perf)});state.lastMatch={fixtureId,date:matchDate,score:[...score],opponent:f.home===state.clubId?f.away:f.home,userPerformance:perf,squadStatus:selection.status,coachAssessment};state.history.push({season:state.season,week:state.week,date:matchDate,score:[...score],appeared:Boolean(perf),squadStatus:selection.status,rating:perf?.rating??null,goals:perf?.goals||0,assists:perf?.assists||0,coachTrustDelta:coachAssessment?.delta??0,coachAssessment:coachAssessment?.assessment??'not-assessed'});recoverWorld(state);";
+          replaceOnce(oldMatch,newMatch,'match completion authority lifecycle');
+
+          replaceOnce(
+            "if(!raw.clock)initializeCareerTime(raw);syncLevelDevelopment(raw);return raw;",
+            "if(!raw.clock)initializeCareerTime(raw);ensureCareerAuthority(raw);syncLevelDevelopment(raw);return raw;",
+            'legacy save authority migration'
+          );
+          fs.writeFileSync(path,s);
+
+          fs.writeFileSync('tests/career-coach-trust-lifecycle.test.js',`import test from 'node:test';
+          import assert from 'node:assert/strict';
+          import {createCareer,nextFixture,completeCareerMatch} from '../career.js';
+
+          test('new careers initialize persistent Coach Trust separately from Tactical Influence',()=>{
+            const state=createCareer({playerName:'Trust Prospect',nationality:'AR',position:'CM',build:'creator',countryId:'AR',clubId:'river'});
+            assert.equal(state.authority.coachTrust,25);
+            assert.equal(state.authority.tacticalInfluence,0);
+            assert.deepEqual(state.authority.coachAssessments,[]);
+          });
+
+          test('career match feeds tactical breakdown into persistent Coach Trust',()=>{
+            const state=createCareer({playerName:'Tactical Test',nationality:'AR',position:'CM',build:'creator',countryId:'AR',clubId:'river'});
+            state.authority.coachTrust=55;
+            const fixture=nextFixture(state);
+            const result=completeCareerMatch(state,fixture.id,{score:[1,1],userPerformance:{rating:8.8,ratingBreakdown:{tactical:4,errors:0},goals:0,assists:0,shots:1,passesAttempted:12,passesCompleted:11,dribblesAttempted:1,dribblesCompleted:1,tackles:1,interceptions:1,staminaUsed:12}});
+            assert.equal(result.ok,true);
+            assert.ok(state.authority.coachTrust<55,'raw match rating must not hide poor tactical compliance');
+            assert.equal(state.authority.tacticalInfluence,0);
+            assert.equal(state.authority.coachAssessments.length,1);
+            assert.equal(state.authority.coachAssessments[0].fixtureId,fixture.id);
+            assert.match(state.authority.coachAssessments[0].assessment,/negative/);
+            assert.equal(state.lastMatch.coachAssessment.delta,state.history.at(-1).coachTrustDelta);
+            assert.equal(state.history.at(-1).coachAssessment,state.authority.coachAssessments[0].assessment);
+          });
+
+          test('non-appearance leaves Coach Trust unchanged and records no fake assessment',()=>{
+            const state=createCareer({playerName:'Reserve Test',nationality:'AR',position:'CM',build:'creator',countryId:'AR',clubId:'river'});
+            for(const p of state.world[state.clubId].roster){p.rating=p.isUser?30:90;p.fitness=100;p.form=0;}
+            const before=state.authority.coachTrust;
+            const fixture=nextFixture(state);
+            const result=completeCareerMatch(state,fixture.id,{score:[0,0],userPerformance:null});
+            assert.equal(result.ok,true);
+            assert.equal(state.authority.coachTrust,before);
+            assert.equal(state.authority.coachAssessments.length,0);
+            assert.equal(state.lastMatch.coachAssessment.assessment,'not-assessed');
+            assert.equal(state.history.at(-1).coachTrustDelta,0);
+            assert.equal(state.history.at(-1).coachAssessment,'not-assessed');
+          });
+          `);
+          NODE
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate source
+        run: npm run check
+
+      - name: Build
+        run: npm run build
+
+      - name: Test full repository
+        run: npm test
+
+      - name: Commit verified slice and remove patch workflow
+        shell: bash
+        run: |
+          rm .github/workflows/agent-coach-trust-match-patch.yml
+          git config user.name "Career Eleven Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add career.js tests/career-coach-trust-lifecycle.test.js .github/workflows/agent-coach-trust-match-patch.yml
+          git commit -m "Wire Coach Trust into career match lifecycle"
+          git push origin HEAD:feature/coach-trust-match-lifecycle-v1
