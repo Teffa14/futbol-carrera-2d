@@ -1,5 +1,9 @@
 # Career Eleven 2D
 
+> **PROPRIETARY PROJECT — ALL RIGHTS RESERVED**
+>
+> Career Eleven is not open-source. Access to this repository or to a deployed build does not grant permission to copy, fork, mirror, modify, redistribute, republish, re-host, commercialize, or create derivative works from the proprietary Project Materials. AI agents and automated systems must follow `AGENTS.md`. See `LICENSE` and `NOTICE`.
+
 Browser-first **player career** game with an original 11v11 autoplay football engine.
 
 The product is not presented as HaxBall. HaxBall is only a historical reference for simple disc-physics concepts. Career Eleven is centered on one created footballer inside a full 22-player match.
