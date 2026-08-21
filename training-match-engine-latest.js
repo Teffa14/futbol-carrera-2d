@@ -1,2 +1,2 @@
-export {TrainingMatchEngine} from './training-match-engine-v5.js';
-export const TRAINING_MATCH_ENGINE_VERSION=5;
+export {TrainingMatchEngine} from './training-match-engine-v6.js';
+export const TRAINING_MATCH_ENGINE_VERSION=6;
