@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createCareer,syncLevelDevelopment} from '../career.js';
+import {createCareer,syncLevelDevelopment,calculateOverall} from '../career.js';
 import {applyNaturalLevelDevelopment} from '../career-development.js';
 
 const ATTRS=['pace','shooting','passing','dribbling','defense','physical','ballControl','vision','stamina','composure'];
@@ -39,14 +39,21 @@ test('legacy level development backfill is idempotent',()=>{
 test('natural level growth stops when dynamic potential has no headroom',()=>{
   const state=createCareer({playerName:'Ceiling',nationality:'AR',position:'CM',build:'creator',countryId:'AR',clubId:'river'});
   const before=snapshot(state.player),overall=state.player.rating;
+  state.player.potential=overall;
   state.player.dynamicPotential=overall;
+  state.player.developmentProfile.potential=overall;
   state.player.developmentProfile.dynamicPotential=overall;
-  state.progress.level=10;
   state.progress.developmentLevelApplied=1;
 
-  const gains=syncLevelDevelopment(state);
+  for(let level=2;level<=10;level++){
+    state.progress.level=level;
+    const beforeLevelRating=state.player.rating;
+    const beforeCalculated=calculateOverall(state.player);
+    const beforePotential=state.player.dynamicPotential;
+    const gains=syncLevelDevelopment(state);
+    assert.deepEqual(gains,[],`level ${level}: rating=${beforeLevelRating}, calculated=${beforeCalculated}, dynamicPotential=${beforePotential}, profilePotential=${state.player.developmentProfile.dynamicPotential}`);
+  }
 
-  assert.deepEqual(gains,[]);
   assert.deepEqual(snapshot(state.player),before);
   assert.equal(state.player.rating,overall);
 });
