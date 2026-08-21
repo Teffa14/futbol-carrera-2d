@@ -39,7 +39,7 @@ const safeJs=bundle.replace(/<\/script/gi,'<\\/script');
 let html=sourceIndex
   .replace(/\s*<link[^>]+href=["']\.\/styles\.css["'][^>]*>/i,'')
   .replace(/\s*<link[^>]+href=["']\.\/character-creation\.css["'][^>]*>/i,'')
-  .replace(moduleMatch[0],`<script>${safeJs}</script>`)
+  .replace(moduleMatch[0],()=>`<script>${safeJs}</script>`)
   .replace('</head>',`<meta name="career-build" content="self-contained"><meta name="career-build-id" content="${buildId}"><style>${safeCss}</style></head>`);
 
 if(/type=["']module["']/i.test(html))throw new Error('Production page still contains an unbundled module entrypoint');
