@@ -32,18 +32,20 @@ const bundle=result.outputFiles?.[0]?.text;
 if(!bundle)throw new Error('esbuild did not produce a browser bundle');
 const baseCss=await readFile(path.join(root,'styles.css'),'utf8');
 const creationCss=await readFile(path.join(root,'character-creation.css'),'utf8');
-const buildId=createHash('sha256').update(sourceIndex).update(bundle).update(baseCss).update(creationCss).digest('hex').slice(0,12);
-const safeCss=`${baseCss}\n${creationCss}`.replace(/<\/style/gi,'<\\/style');
+const landingCss=await readFile(path.join(root,'public-landing.css'),'utf8');
+const buildId=createHash('sha256').update(sourceIndex).update(bundle).update(baseCss).update(creationCss).update(landingCss).digest('hex').slice(0,12);
+const safeCss=`${baseCss}\n${creationCss}\n${landingCss}`.replace(/<\/style/gi,'<\\/style');
 const safeJs=bundle.replace(/<\/script/gi,'<\\/script');
 
 let html=sourceIndex
   .replace(/\s*<link[^>]+href=["']\.\/styles\.css["'][^>]*>/i,'')
   .replace(/\s*<link[^>]+href=["']\.\/character-creation\.css["'][^>]*>/i,'')
+  .replace(/\s*<link[^>]+href=["']\.\/public-landing\.css["'][^>]*>/i,'')
   .replace(moduleMatch[0],()=>`<script>${safeJs}</script>`)
   .replace('</head>',`<meta name="career-build" content="self-contained"><meta name="career-build-id" content="${buildId}"><style>${safeCss}</style></head>`);
 
 if(/type=["']module["']/i.test(html))throw new Error('Production page still contains an unbundled module entrypoint');
-if(/(?:src|href)=["']\.\/(?:app|styles|character-creation)\./i.test(html))throw new Error('Production page still depends on separate core assets');
+if(/(?:src|href)=["']\.\/(?:app|styles|character-creation|public-landing)\./i.test(html))throw new Error('Production page still depends on separate core assets');
 if(html.includes('raw.githubusercontent.com'))throw new Error('Production page must not fetch executable modules from GitHub');
 if(!html.includes('<meta name="career-build" content="self-contained">'))throw new Error('Production page lost the stable loader compatibility marker');
 
