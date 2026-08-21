@@ -9,10 +9,10 @@ const root=path.resolve(testsDir,'..');
 const dist=path.join(root,'dist');
 const html=()=>fs.readFileSync(path.join(dist,'index.html'),'utf8');
 
-test('production artifact is one self-contained HTML file',()=>{
+test('production artifact is one self-contained HTML file with a content fingerprint',()=>{
   assert.ok(fs.existsSync(path.join(dist,'index.html')),'dist/index.html must exist');
   assert.deepEqual(fs.readdirSync(dist).sort(),['index.html']);
-  assert.match(html(),/<meta name="career-build" content="self-contained">/);
+  assert.match(html(),/<meta name="career-build" content="[a-f0-9]{12}">/);
 });
 
 test('production page embeds styles and executable game code',()=>{
@@ -29,4 +29,14 @@ test('production page has no runtime GitHub module loader or missing core asset 
   assert.doesNotMatch(source,/createObjectURL\s*\(\s*new Blob/);
   assert.doesNotMatch(source,/(?:src|href)=["']\.\/(?:app|styles|character-creation)\./i);
   assert.doesNotMatch(source,/from\s+['"]\.\//);
+});
+
+test('Vercel never serves a stale game shell that requires Ctrl+F5',()=>{
+  const config=JSON.parse(fs.readFileSync(path.join(root,'vercel.json'),'utf8'));
+  const headers=config.headers?.find(rule=>rule.source==='/(.*)')?.headers||[];
+  const values=Object.fromEntries(headers.map(h=>[String(h.key).toLowerCase(),String(h.value).toLowerCase()]));
+  assert.match(values['cache-control']||'',/no-store/);
+  assert.match(values['cache-control']||'',/max-age=0/);
+  assert.equal(values['cdn-cache-control'],'no-store');
+  assert.equal(values['vercel-cdn-cache-control'],'no-store');
 });
