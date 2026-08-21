@@ -12,7 +12,7 @@ function style(){if(document.querySelector('style[data-training-ui-v2]'))return;
 `;document.head.appendChild(s);}
 function keyStats(player,catalog){const ids=[...new Set(catalog.flatMap(d=>primaryTrainingStats(d,3).map(x=>x.id)))];return ids.sort((a,b)=>(player[a]||50)-(player[b]||50)).slice(0,5);}
 function card(state,d,recommended){
-  const attrs=primaryTrainingStats(d,4),progress=trainingDevelopmentProgress(state.player,d.id),lead=progress[0],difficulty=trainingDifficulty(state.player,d);
+  const attrs=primaryTrainingStats(d,4),progress=trainingDevelopmentProgress(state.player,d),lead=progress[0],difficulty=trainingDifficulty(state.player,d);
   return `<button class="tr2-card ${recommended.has(d.id)?'recommended':''}" data-drill-sim="${d.id}" ${state.progress.trainingPoints<=0?'disabled':''}>${recommended.has(d.id)?'<span class="rec">RECOMENDADO</span>':''}<div><div class="tr2-meta"><span>${esc(d.category)}</span><span>${esc(difficulty)}</span></div><h3>${esc(d.name)}</h3></div><p>${esc(d.desc)}</p><div class="tr2-attrs">${attrs.map(({id})=>`<div class="tr2-attr"><span>${esc(attrLabel(id))}</span><b>${state.player[id]??'—'}</b></div>`).join('')}</div><div class="tr2-markers">${d.markers.map(m=>`<span>${esc(m.label)}</span>`).join('<span>·</span>')}</div><div class="tr2-progress"><span>Próximo punto ${lead?esc(attrLabel(lead.attr)):'—'}</span><b>${lead?lead.percent:0}%</b></div></button>`;
 }
 export function trainingHomeMarkup(state){
