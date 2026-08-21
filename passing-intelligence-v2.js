@@ -1,5 +1,6 @@
 import {MatchEngine} from './engine.js';
 import {FIELD,isOffsidePosition} from './football-rules-v2.js';
+import {controlAtPoint,interceptionWindow} from './dynamic-space-control-v1.js';
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const lerp=(a,b,t)=>a+(b-a)*t;
@@ -38,16 +39,44 @@ function passAim(p,m,kind){
   return{x:clamp(m.x+(m.vx||0)*6,FIELD.left+18,FIELD.right-18),y:clamp(m.y+(m.vy||0)*6,FIELD.top+16,FIELD.bottom-16)};
 }
 
+function plannedPassPower(p,kind,aim){
+  const passing=Number(p.data?.passing??65),distance=dist(p,aim);let power=clamp(2.85+distance/92+(passing-60)*.012,2.9,7.15);
+  if(kind==='support')power*=.82;if(kind==='cutback')power*=.88;if(kind==='switch')power*=1.06;
+  return power;
+}
+
+function estimatedBallTravelTime(distance,power,{loft=false}={}){
+  let remaining=Math.max(0,Number(distance)||0),speed=Math.max(.1,Number(power)||.1)*(loft?.92:1),frames=0;
+  while(remaining>0&&frames<360){remaining-=speed;speed*=.993;frames++;if(speed<.08)break;}
+  return frames/60;
+}
+
+export function assessTemporalPass(engine,p,receiver,aim,{kind='progressive',loft=false}={}){
+  const defenders=(engine?.players||[]).filter(x=>x&&x.team!==p.team),distance=dist(p,aim),power=plannedPassPower(p,kind,aim),samples=[.30,.52,.74,.92];
+  let worstMargin=-Infinity,bestInterceptor=null,interceptable=false;
+  for(const fraction of samples){
+    const point={x:lerp(p.x,aim.x,fraction),y:lerp(p.y,aim.y,fraction)},arrivalTime=estimatedBallTravelTime(distance*fraction,power,{loft});
+    const window=interceptionWindow(defenders,point,{arrivalTime,buffer:loft?.02:.08});
+    if(window.margin>worstMargin){worstMargin=window.margin;bestInterceptor=window.best?.player||null;}
+    if(window.canIntercept)interceptable=true;
+  }
+  const control=controlAtPoint([receiver,...defenders],aim,{team:p.team,contestWindow:.18}),controlAdvantage=Number.isFinite(control.advantage)?control.advantage:1.25;
+  const interceptionRisk=interceptable?clamp(.35+Math.max(0,worstMargin)*1.25,.35,1):clamp((worstMargin+.10)*1.1,0,.30);
+  const arrivalAdvantage=clamp(controlAdvantage/1.15,-1,1);
+  return{interceptable,interceptionRisk,arrivalAdvantage,controlAdvantage,worstMargin,bestInterceptor,estimatedArrival:estimatedBallTravelTime(distance,power,{loft})};
+}
+
 export function evaluatePassOptions(engine,p){
   const vision=Number(p.data.vision??p.data.passing??65),passing=Number(p.data.passing??65),dir=p.team===0?1:-1,perception=190+vision*3.2,opps=engine.players.filter(x=>x.team!==p.team),options=[];
   for(const m of engine.players){
     if(m.team!==p.team||m.id===p.id||(m.role==='GK'&&roleFamily(p.role)==='FWD'))continue;
     const distance=dist(p,m);if(distance<28||distance>perception||isOffsidePosition(engine,m,engine.ball.x))continue;
-    const forward=(m.x-p.x)*dir,open=laneOpen(engine,p,m),kind=passKindFor(p,m,distance,forward,open),aim=passAim(p,m,kind),aimOpen=Math.min(...opps.map(o=>dist(o,aim)),180);
+    const forward=(m.x-p.x)*dir,open=laneOpen(engine,p,m),kind=passKindFor(p,m,distance,forward,open),aim=passAim(p,m,kind),aimOpen=Math.min(...opps.map(o=>dist(o,aim)),180),loft=kind==='lob-through'||(kind==='cross'&&open<15),temporal=assessTemporalPass(engine,p,m,aim,{kind,loft});
     const roleBonus=roleFamily(m.role)==='FWD'?.10:roleFamily(m.role)==='MID'?.055:0,progressive=clamp(forward/250,-.55,1.15),space=clamp((open-10)/70,-.35,1.15),targetSpace=clamp((aimOpen-18)/85,-.25,.9),distanceCost=distance/900;
     const kindBonus={support:.05,progressive:.15,through:.29,'lob-through':.24,switch:.17,cross:.23,cutback:.34}[kind]||0;
-    const score=space*.36+targetSpace*.22+progressive*.30+roleBonus+kindBonus+(vision+passing-130)/500-distanceCost;
-    options.push({player:m,kind,aim,distance,forward,open,score,loft:kind==='lob-through'||(kind==='cross'&&open<15)});
+    const temporalValue=temporal.arrivalAdvantage*.18-temporal.interceptionRisk*.48;
+    const score=space*.30+targetSpace*.16+progressive*.30+roleBonus+kindBonus+(vision+passing-130)/500-distanceCost+temporalValue;
+    options.push({player:m,kind,aim,distance,forward,open,score,loft,temporal});
   }
   return options.sort((a,b)=>b.score-a.score);
 }
@@ -101,4 +130,4 @@ MatchEngine.prototype.prepareBallAction=function footballDecision(p){
   if(best)return armIntentPass(this,p,best);return startIndependentDribble(this,p,near.player);
 };
 
-export const __passingTest={passKindFor,passAim,clearForwardSpace,shotOpportunity,shouldShoot};
+export const __passingTest={passKindFor,passAim,clearForwardSpace,shotOpportunity,shouldShoot,plannedPassPower,estimatedBallTravelTime};
