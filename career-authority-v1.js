@@ -25,6 +25,43 @@ export function deriveTacticalInfluence({
   0,100));
 }
 
+export function coachTrustAssessment({
+  currentTrust=25,
+  matchRating=6,
+  tacticalRating=6,
+  errorCost=0,
+  appeared=true,
+}={}){
+  const before=clamp(n(currentTrust,25),0,100);
+  if(!appeared)return{
+    before,
+    after:before,
+    delta:0,
+    tacticalSignal:0,
+    performanceSignal:0,
+    errorPenalty:0,
+    assessment:'not-assessed',
+  };
+
+  const tacticalSignal=clamp((n(tacticalRating,6)-6)/2.5,-1,1);
+  const performanceSignal=clamp((n(matchRating,6)-6)/4,-1,1);
+  const errorPenalty=clamp(Math.max(0,n(errorCost,0))/2,0,1);
+  const raw=tacticalSignal*.65+performanceSignal*.25-errorPenalty*.10;
+  const delta=clamp(Math.round(raw*5),-5,5);
+  const after=clamp(before+delta,0,100);
+  const assessment=delta>=3?'strong-positive':delta>0?'positive':delta<=-3?'strong-negative':delta<0?'negative':'neutral';
+
+  return{
+    before,
+    after,
+    delta:after-before,
+    tacticalSignal:Math.round(tacticalSignal*1000)/1000,
+    performanceSignal:Math.round(performanceSignal*1000)/1000,
+    errorPenalty:Math.round(errorPenalty*1000)/1000,
+    assessment,
+  };
+}
+
 export function authorityPermissions({coachTrust=0,tacticalInfluence=0}={}){
   const trust=clamp(n(coachTrust),0,100),influence=clamp(n(tacticalInfluence),0,100);
   const roleSecurity=trust>=72?'trusted':trust>=48?'established':trust>=28?'fragile':'unproven';
