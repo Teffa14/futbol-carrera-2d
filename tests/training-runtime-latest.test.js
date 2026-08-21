@@ -11,13 +11,12 @@ const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const files=fs.readdirSync(root);
 function latest(prefix){const versions=files.map(name=>new RegExp(`^${prefix}-v(\\d+)\\.js$`).exec(name)).filter(Boolean).map(m=>Number(m[1]));return Math.max(...versions);}
 
-test('canonical training runtime manifest always matches newest checked-in modules',()=>{
+test('canonical training runtime uses newest isolated engine instead of legacy patch families',()=>{
   assert.equal(TRAINING_RUNTIME_VERSIONS.matchEngine,latest('training-match-engine'));
-  assert.equal(TRAINING_RUNTIME_VERSIONS.intelligence,latest('training-intelligence'));
-  assert.equal(TRAINING_RUNTIME_VERSIONS.smallSided,latest('training-small-sided'));
-  assert.equal(TRAINING_RUNTIME_VERSIONS.transfer,latest('training-transfer'));
-  assert.equal(TRAINING_RUNTIME_VERSIONS.competitive,latest('training-competitive'));
+  assert.equal(TRAINING_RUNTIME_VERSIONS.authoritativeScenarios,TRAINING_RUNTIME_VERSIONS.matchEngine);
+  assert.equal(TRAINING_RUNTIME_VERSIONS.framework,2);
   assert.equal(TRAINING_RUNTIME_VERSIONS.liveUi,latest('training-live-ui'));
+  for(const legacy of ['intelligence','smallSided','transfer','competitive','roleScenarios'])assert.equal(legacy in TRAINING_RUNTIME_VERSIONS,false,`${legacy} must not govern production training`);
 });
 
 test('canonical training runtime still specializes the current 11v11 MatchEngine',()=>{
