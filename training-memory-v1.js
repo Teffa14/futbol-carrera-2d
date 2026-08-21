@@ -14,6 +14,7 @@ export const DRILLS=[
 ];
 
 export function drillById(id){return DRILLS.find(d=>d.id===id)||null;}
+function resolveDrill(drillOrId,override=null){if(override?.id)return override;if(drillOrId&&typeof drillOrId==='object'&&drillOrId.id)return drillOrId;return drillById(drillOrId);}
 export function ensureTrainingMemory(state){
   if(!state?.player)return state;
   state.player.trainingMemory??={};
@@ -31,12 +32,12 @@ function weightedAbility(player,attrs){let total=0,w=0;for(const [key,weight] of
 function gradeFor(q){return q>=91?'S':q>=82?'A':q>=72?'B':q>=62?'C':q>=52?'D':'E';}
 const GRADE_VALUE={S:6,A:5,B:4,C:3,D:2,E:1};
 
-export function previewTrainingResult(state,drillId,attempt=0){
-  ensureTrainingMemory(state);const drill=drillById(drillId);if(!drill)throw new Error('Ejercicio inválido');
-  const p=state.player,r=rngFor(`${state.season}|${state.week}|${p.name}|${drillId}|${attempt}|${state.player.trainingLog.length}`),ability=weightedAbility(p,drill.attrs),familiarity=drill.memories.reduce((s,k)=>s+memoryLevel(p,k),0)/drill.memories.length;
+export function previewTrainingResult(state,drillId,attempt=0,drillOverride=null){
+  ensureTrainingMemory(state);const drill=resolveDrill(drillId,drillOverride);if(!drill)throw new Error('Ejercicio inválido');
+  const p=state.player,r=rngFor(`${state.season}|${state.week}|${p.name}|${drill.id}|${attempt}|${state.player.trainingLog.length}`),ability=weightedAbility(p,drill.attrs),familiarity=drill.memories.reduce((s,k)=>s+memoryLevel(p,k),0)/drill.memories.length;
   const form=Number(p.form||0)*1.6,fitness=(Number(p.fitness??100)-75)*.10,variation=(r()+r()+r()-1.5)*10;
   const quality=clamp(Math.round(ability*.68+familiarity*.19+form+fitness+variation),35,98),reps=6+Math.floor(r()*6),successes=clamp(Math.round(reps*(.34+quality/155)+(r()-.5)*1.6),0,reps),grade=gradeFor(quality);
-  return{drillId,quality,grade,reps,successes,ability:Math.round(ability),memoryBefore:Math.round(familiarity),seed:`${state.season}-${state.week}-${drillId}-${attempt}`};
+  return{drillId:drill.id,quality,grade,reps,successes,ability:Math.round(ability),memoryBefore:Math.round(familiarity),seed:`${state.season}-${state.week}-${drill.id}-${attempt}`};
 }
 
 export function developmentWorkThreshold(value){const v=clamp(Number(value)||50,30,99);if(v<50)return 58+(v-30)*.8;if(v<65)return 76+(v-50)*2;if(v<75)return 108+(v-65)*4.2;if(v<85)return 152+(v-75)*7.5;return 232+(v-85)*12.5;}
@@ -48,10 +49,10 @@ function nextAttributeProgress(player,drill){
     return{attr,weight,work:+work.toFixed(1),threshold:+threshold.toFixed(1),percent};
   }).sort((a,b)=>b.weight-a.weight||b.percent-a.percent);
 }
-export function trainingDevelopmentProgress(player,drillId){const drill=drillById(drillId);return drill?nextAttributeProgress(player,drill):[];}
+export function trainingDevelopmentProgress(player,drillOrId){const drill=resolveDrill(drillOrId);return drill?nextAttributeProgress(player,drill):[];}
 
-export function applyTrainingResult(state,result,calculateOverall=null){
-  ensureTrainingMemory(state);const drill=drillById(result?.drillId);if(!drill)return{ok:false,message:'Ejercicio inválido'};
+export function applyTrainingResult(state,result,calculateOverall=null,drillOverride=null){
+  ensureTrainingMemory(state);const drill=resolveDrill(result?.drillId,drillOverride);if(!drill)return{ok:false,message:'Ejercicio inválido'};
   if((state.progress?.trainingPoints??0)<=0)return{ok:false,message:'No quedan sesiones esta semana'};
   const p=state.player,oldSessions=p.trainingSummary.sessions||0,oldAvg=p.trainingSummary.avgGrade||0,gradeValue=GRADE_VALUE[result.grade]||1,reps=Math.max(1,Number(result.reps)||1),successRate=clamp((Number(result.successes)||0)/reps,0,1);
   const memoryGain=clamp(Math.round(2+result.quality/14+successRate*3),3,12);
