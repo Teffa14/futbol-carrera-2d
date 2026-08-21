@@ -63,7 +63,7 @@ function runBehindAttack(e,dt){
   const q=e.trainingQualityV6,m=e.trainingMetricsV6;
   q.phase='Atacar la espalda';
   if(e.ball.x<q.lineX+18){
-    e.move(e.player,{x:q.lineX+64,y:q.lead.y});
+    e.move(e.player,{x:q.lineX+64,y:q.lead.y},dt);
   }else{
     const intercept=e.projectedIntercept(e.player);
     e.move(e.player,{x:Math.max(q.lineX+22,intercept.x),y:clamp(intercept.y,245,455)},dt);
