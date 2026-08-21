@@ -73,7 +73,7 @@ export function decayOpponentAdaptation(state,{currentTick,halfLifeTicks=900}={}
   const now=Math.max(root.matchTick,Number(currentTick)||root.matchTick);root.matchTick=now;
   const half=Math.max(60,Number(halfLifeTicks)||900);
   for(const row of Object.values(root.opponents))for(const stat of Object.values(row.behaviors)){
-    const age=Math.max(0,now-Number(stat.lastTick||0));if(age<half)return;
+    const age=Math.max(0,now-Number(stat.lastTick||0));if(age<half)continue;
     const factor=Math.pow(.5,age/half);stat.count=round3(stat.count*factor);stat.successes=round3(stat.successes*factor);
   }
   return root;
