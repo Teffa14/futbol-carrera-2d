@@ -1,3 +1,4 @@
+import {createHash} from 'node:crypto';
 import {mkdir, readFile, rm, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -31,6 +32,7 @@ const bundle=result.outputFiles?.[0]?.text;
 if(!bundle)throw new Error('esbuild did not produce a browser bundle');
 const baseCss=await readFile(path.join(root,'styles.css'),'utf8');
 const creationCss=await readFile(path.join(root,'character-creation.css'),'utf8');
+const buildId=createHash('sha256').update(sourceIndex).update(bundle).update(baseCss).update(creationCss).digest('hex').slice(0,12);
 const safeCss=`${baseCss}\n${creationCss}`.replace(/<\/style/gi,'<\\/style');
 const safeJs=bundle.replace(/<\/script/gi,'<\\/script');
 
@@ -38,7 +40,7 @@ let html=sourceIndex
   .replace(/\s*<link[^>]+href=["']\.\/styles\.css["'][^>]*>/i,'')
   .replace(/\s*<link[^>]+href=["']\.\/character-creation\.css["'][^>]*>/i,'')
   .replace(moduleMatch[0],`<script>${safeJs}</script>`)
-  .replace('</head>',`<meta name="career-build" content="self-contained"><style>${safeCss}</style></head>`);
+  .replace('</head>',`<meta name="career-build" content="${buildId}"><style>${safeCss}</style></head>`);
 
 if(/type=["']module["']/i.test(html))throw new Error('Production page still contains an unbundled module entrypoint');
 if(/(?:src|href)=["']\.\/(?:app|styles|character-creation)\./i.test(html))throw new Error('Production page still depends on separate core assets');
@@ -47,4 +49,4 @@ if(html.includes('raw.githubusercontent.com'))throw new Error('Production page m
 await rm(out,{recursive:true,force:true});
 await mkdir(out,{recursive:true});
 await writeFile(path.join(out,'index.html'),html,'utf8');
-console.log(`Self-contained production build ready: ${Buffer.byteLength(html)} bytes`);
+console.log(`Self-contained production build ${buildId} ready: ${Buffer.byteLength(html)} bytes`);
