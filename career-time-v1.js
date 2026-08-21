@@ -36,7 +36,15 @@ export function careerSeasonStartDate(countryId='AR',season=1){
 }
 
 function playerKey(player,index=0){return player?.instanceId||player?.id||player?.name||`player-${index}`;}
-function ensurePlayerBirthDate(player,currentDate,index=0){
+function anchorPlayerBirthDate(player,currentDate,index=0){
+  if(!player)return;
+  const intendedAge=clamp(Math.round(Number(player.age)||18),0,60);
+  let valid=false;
+  try{valid=Boolean(player.birthDate)&&ageOnDate(player.birthDate,currentDate)===intendedAge;}catch{valid=false;}
+  if(!valid)player.birthDate=birthDateForAge(intendedAge,currentDate,{seed:playerKey(player,index)});
+  player.age=ageOnDate(player.birthDate,currentDate);
+}
+function syncPlayerAge(player,currentDate,index=0){
   if(!player)return;
   if(!player.birthDate)player.birthDate=birthDateForAge(player.age??18,currentDate,{seed:playerKey(player,index)});
   player.age=ageOnDate(player.birthDate,currentDate);
@@ -46,9 +54,9 @@ export function synchronizeCareerAges(state){
   const currentDate=state?.clock?.currentDate;
   if(!currentDate)return state;
   let i=0;
-  for(const club of Object.values(state.world||{}))for(const player of club.roster||[])ensurePlayerBirthDate(player,currentDate,i++);
-  ensurePlayerBirthDate(state.player,currentDate,i);
-  if(state.player?.developmentProfile)state.player.developmentProfile.age=state.player.age;
+  for(const club of Object.values(state.world||{}))for(const player of club.roster||[])syncPlayerAge(player,currentDate,i++);
+  syncPlayerAge(state.player,currentDate,i);
+  if(state.player?.developmentProfile){state.player.developmentProfile.age=state.player.age;state.player.developmentProfile.birthDate=state.player.birthDate;}
   return state;
 }
 
@@ -56,7 +64,10 @@ export function initializeCareerTime(state,{startDate=null}={}){
   if(!state)throw new Error('Career state required');
   const currentDate=startDate||careerSeasonStartDate(state.countryId,state.season||1);
   state.clock={currentDate,startedAt:currentDate,elapsedDays:0,lastAdvanceDays:0};
-  synchronizeCareerAges(state);
+  let i=0;
+  for(const club of Object.values(state.world||{}))for(const player of club.roster||[])anchorPlayerBirthDate(player,currentDate,i++);
+  anchorPlayerBirthDate(state.player,currentDate,i);
+  if(state.player?.developmentProfile){state.player.developmentProfile.age=state.player.age;state.player.developmentProfile.birthDate=state.player.birthDate;}
   return state.clock;
 }
 
