@@ -1,4 +1,4 @@
-import {developmentStage} from './career-development.js';
+import {developmentStage,applySeasonalAgeDecline} from './career-development.js';
 
 const MS_DAY=24*60*60*1000;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -89,9 +89,23 @@ export function advanceCareerDays(state,days=7){
   return state.clock;
 }
 
+function applySeasonAgeCurve(state,season){
+  const seen=new Set();
+  for(const club of Object.values(state.world||{}))for(const player of club.roster||[]){
+    const key=playerKey(player);
+    if(seen.has(key))continue;
+    seen.add(key);
+    applySeasonalAgeDecline(player,{season});
+  }
+  const userKey=playerKey(state.player);
+  if(state.player&&!seen.has(userKey))applySeasonalAgeDecline(state.player,{season});
+  syncDevelopmentProfile(state.player);
+}
+
 export function rollCareerToSeasonStart(state,season=state?.season||1){
   if(!state?.clock)initializeCareerTime(state);
   const target=careerSeasonStartDate(state.countryId,season),gap=daysBetweenISO(state.clock.currentDate,target);
   if(gap>0)advanceCareerDays(state,gap);else synchronizeCareerAges(state);
+  applySeasonAgeCurve(state,season);
   return state.clock;
 }
