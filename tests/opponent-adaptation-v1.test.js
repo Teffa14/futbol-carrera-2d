@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createOpponentAdaptationState,observeOpponentBehavior,expectationProfile,defenderAdaptation,deceptionWindow,decayOpponentAdaptation} from '../opponent-adaptation-v1.js';
+import fs from 'node:fs';
+import {createOpponentAdaptationState,observeOpponentBehavior,expectationProfile,defenderAdaptation,deceptionWindow,classifyWideBehavior,defensiveResponseTarget,decayOpponentAdaptation} from '../opponent-adaptation-v1.js';
 
 test('repeated behavior creates a bounded contextual expectation',()=>{
   const state={opponentAdaptation:createOpponentAdaptationState()};
@@ -47,6 +48,45 @@ test('matching the expected action never receives a deception bonus',()=>{
   const surprise=deceptionWindow(state,{opponentId:'lw-11',context:'wide-isolation',actualBehavior:'cut-inside',defenderIntelligence:78});
   assert.equal(surprise.surprise,0);
   assert.equal(surprise.reactionDelayMs,0);
+});
+
+test('wide movement is classified from physical velocity rather than a scripted action label',()=>{
+  assert.equal(classifyWideBehavior({attacker:{y:90,vx:1,vy:1},attackDirection:1,centerY:210}),'cut-inside');
+  assert.equal(classifyWideBehavior({attacker:{y:90,vx:1,vy:-1},attackDirection:1,centerY:210}),'go-outside');
+  assert.equal(classifyWideBehavior({attacker:{y:90,vx:1,vy:0},attackDirection:1,centerY:210}),'drive-forward');
+});
+
+test('learned inside tendency moves the primary defensive target into the inside lane',()=>{
+  const state={opponentAdaptation:createOpponentAdaptationState()};
+  for(let i=0;i<8;i++)observeOpponentBehavior(state,{opponentId:'rw-7',context:'wide-isolation',behavior:'cut-inside',tick:i+1});
+  const attacker={x:700,y:90},defender={x:720,y:100};
+  const response=defensiveResponseTarget(state,{opponentId:'rw-7',context:'wide-isolation',defenderIntelligence:82,defender,attacker,attackDirection:1,centerY:210});
+  assert.equal(response.mode,'protect-inside');
+  assert.ok(response.x>attacker.x,'defender should remain goal-side');
+  assert.ok(response.y>attacker.y,'defender should close the inside lane toward field center');
+});
+
+test('learned outside tendency protects the touchline route instead of using the same target',()=>{
+  const state={opponentAdaptation:createOpponentAdaptationState()};
+  for(let i=0;i<8;i++)observeOpponentBehavior(state,{opponentId:'rw-7',context:'wide-isolation',behavior:'go-outside',tick:i+1});
+  const attacker={x:700,y:90},defender={x:720,y:100};
+  const response=defensiveResponseTarget(state,{opponentId:'rw-7',context:'wide-isolation',defenderIntelligence:82,defender,attacker,attackDirection:1,centerY:210});
+  assert.equal(response.mode,'protect-outside');
+  assert.ok(response.y<attacker.y);
+});
+
+test('insufficient evidence leaves the original pressure target untouched',()=>{
+  const state={opponentAdaptation:createOpponentAdaptationState()};
+  const response=defensiveResponseTarget(state,{opponentId:'rw-7',context:'wide-isolation',defenderIntelligence:82,defender:{x:720,y:100},attacker:{x:700,y:90},attackDirection:1,centerY:210});
+  assert.equal(response,null);
+});
+
+test('agent brain wires contextual observation into primary pressure without touching ball state',()=>{
+  const source=fs.readFileSync(new URL('../agent-brain-v2.js',import.meta.url),'utf8');
+  assert.match(source,/observeOpponentBehavior\(engine/);
+  assert.match(source,/defensiveResponseTarget\(engine/);
+  assert.match(source,/if\(primaryPresser\)return adaptivePrimaryPressure/);
+  assert.doesNotMatch(source,/ownerId|ball\.x\s*=|ball\.y\s*=/);
 });
 
 test('old match evidence decays rather than becoming permanent omniscience',()=>{

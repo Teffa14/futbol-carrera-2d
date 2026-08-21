@@ -1,6 +1,7 @@
 import {MatchEngine} from './engine.js';
 import {FIELD,onsideLimit} from './football-rules-v2.js';
 import {motionProfile} from './locomotion-v2.js';
+import {classifyWideBehavior,defensiveResponseTarget,observeOpponentBehavior} from './opponent-adaptation-v1.js';
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
@@ -8,6 +9,8 @@ function hashString(s){let h=2166136261;for(const ch of String(s)){h^=ch.charCod
 function noise(key,salt=''){let h=hashString(`${key}|${salt}`);h^=h>>>16;h=Math.imul(h,0x7feb352d);h^=h>>>15;return((h>>>0)%10000)/9999;}
 function playerKey(p){return String(p?.id||p?.data?.instanceId||p?.data?.name||'player');}
 function roleFamily(role){if(role==='GK')return'GK';if(['CB','LB','RB'].includes(role))return'DEF';if(['CDM','CM','CAM'].includes(role))return'MID';return'FWD';}
+function tacticalIntelligence(p){return clamp(Number(p?.data?.tacticalIQ??p?.data?.vision??p?.data?.composure??65)||65,0,100);}
+function wideContext(p){const half=(FIELD.bottom-FIELD.top)*.5;return Math.abs((Number(p?.y)||FIELD.centerY)-FIELD.centerY)>half*.54?'wide-isolation':'general';}
 
 export function positionalIdentity(p){const key=playerKey(p);return{width:noise(key,'width')*2-1,depth:noise(key,'depth')*2-1,roam:noise(key,'roam')*2-1,support:noise(key,'support'),aggression:noise(key,'aggression'),risk:noise(key,'risk'),reaction:motionProfile(p).reaction};}
 
@@ -32,6 +35,18 @@ function spacingCandidate(engine,p,base,possession){
   return{x:best.x,y:best.y};
 }
 
+function adaptivePrimaryPressure(engine,p,actor,base){
+  if(!actor||actor.team===p.team)return base;
+  const context=wideContext(actor),attackDirection=actor.team===0?1:-1,behavior=classifyWideBehavior({attacker:actor,attackDirection,centerY:FIELD.centerY});
+  const samplePeriod=24,samplePhase=hashString(playerKey(actor))%samplePeriod;
+  if(context==='wide-isolation'&&engine.tick%samplePeriod===samplePhase&&behavior){
+    observeOpponentBehavior(engine,{opponentId:playerKey(actor),context,behavior,tick:engine.tick});
+  }
+  const response=defensiveResponseTarget(engine,{opponentId:playerKey(actor),context,defenderIntelligence:tacticalIntelligence(p),scoutingKnowledge:Number(engine.scoutingKnowledge)||0,defender:p,attacker:actor,attackDirection,centerY:FIELD.centerY});
+  if(!response)return base;
+  return{x:clamp(response.x,FIELD.left+p.r,FIELD.right-p.r),y:clamp(response.y,FIELD.top+p.r,FIELD.bottom-p.r)};
+}
+
 const originalAiTarget=MatchEngine.prototype.aiTarget;
 MatchEngine.prototype.aiTarget=function independentFootballAgent(p,pressers,actor,possession){
   let base=originalAiTarget.call(this,p,pressers,actor,possession);
@@ -45,11 +60,12 @@ MatchEngine.prototype.aiTarget=function independentFootballAgent(p,pressers,acto
       return{x:clamp(tx,FIELD.left+p.r,FIELD.right-p.r),y:clamp(ty,FIELD.top+p.r,FIELD.bottom-p.r)};
     }
   }
-  if(isActor||primaryPresser)return base;
+  if(isActor)return base;
+  if(primaryPresser)return adaptivePrimaryPressure(this,p,actor,base);
   const state=possession===null?'loose':String(possession),reaction=(p.motion||motionProfile(p)).reaction,period=Math.round(clamp(12-reaction*.075+noise(playerKey(p),'cadence')*5,4,12));
   if(p.brainTarget&&p.brainPossession===state&&this.tick<p.brainUntil)return p.brainTarget;
   base=spacingCandidate(this,p,base,possession);p.brainTarget=base;p.brainPossession=state;p.brainUntil=this.tick+period;
   return base;
 };
 
-export const __agentBrainTest={spacingCandidate};
+export const __agentBrainTest={spacingCandidate,adaptivePrimaryPressure,wideContext};
