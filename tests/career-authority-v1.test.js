@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {deriveTacticalInfluence,coachTrustAssessment,authorityPermissions,careerAuthoritySnapshot} from '../career-authority-v1.js';
+import {deriveTacticalInfluence,coachTrustAssessment,ensureCareerAuthority,applyCoachTrustToCareer,authorityPermissions,careerAuthoritySnapshot} from '../career-authority-v1.js';
 import {createRoleContract} from '../role-contract-v1.js';
 
 test('coach trust does not generate tactical influence by itself',()=>{
@@ -43,6 +43,40 @@ test('a non-appearance does not fabricate a coach assessment',()=>{
   assert.equal(result.after,47);
   assert.equal(result.delta,0);
   assert.equal(result.assessment,'not-assessed');
+});
+
+test('career authority initializes legacy saves without erasing influence',()=>{
+  const state={authority:{tacticalInfluence:42}};
+  const authority=ensureCareerAuthority(state);
+  assert.equal(authority.coachTrust,25);
+  assert.equal(authority.tacticalInfluence,42);
+  assert.deepEqual(authority.coachAssessments,[]);
+});
+
+test('post-match coach assessment persists trust and evidence without changing influence',()=>{
+  const state={authority:{coachTrust:34,tacticalInfluence:51,coachAssessments:[]}};
+  const result=applyCoachTrustToCareer(state,{fixtureId:'r1',date:'2026-08-21',matchRating:6.2,tacticalRating:8,errorCost:0.1,appeared:true});
+  assert.equal(state.authority.coachTrust,result.after);
+  assert.equal(state.authority.tacticalInfluence,51);
+  assert.equal(state.authority.coachAssessments.length,1);
+  assert.equal(state.authority.coachAssessments[0].fixtureId,'r1');
+  assert.ok(result.delta>0);
+});
+
+test('career adapter does not record a fake assessment for a non-appearance',()=>{
+  const state={authority:{coachTrust:47,tacticalInfluence:20,coachAssessments:[]}};
+  const result=applyCoachTrustToCareer(state,{matchRating:10,tacticalRating:10,appeared:false});
+  assert.equal(result.assessment,'not-assessed');
+  assert.equal(state.authority.coachTrust,47);
+  assert.equal(state.authority.coachAssessments.length,0);
+});
+
+test('career coach history stays bounded',()=>{
+  const state={authority:{coachTrust:50,tacticalInfluence:0,coachAssessments:Array.from({length:30},(_,i)=>({fixtureId:`old-${i}`}))}};
+  applyCoachTrustToCareer(state,{fixtureId:'new',matchRating:7,tacticalRating:7,appeared:true});
+  assert.equal(state.authority.coachAssessments.length,30);
+  assert.equal(state.authority.coachAssessments.at(-1).fixtureId,'new');
+  assert.equal(state.authority.coachAssessments[0].fixtureId,'old-1');
 });
 
 test('high influence cannot bypass a coach who does not trust the player',()=>{
