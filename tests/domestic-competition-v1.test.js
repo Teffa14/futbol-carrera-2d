@@ -33,17 +33,15 @@ test('odd club counts produce a valid schedule without bye fixtures',()=>{
 
 test('standings derive from recorded results with football tie breakers',()=>{
   let league=createDomesticCompetition({id:'l1',name:'Liga',country:'AR',season:2026,tier:1,clubIds:['a','b','c'],doubleRoundRobin:false});
-  const fixtures=league.fixtures;
   const scoreByPair=new Map([
-    [['a','b'].sort().join('|')],[2,0]],
-    [['a','c'].sort().join('|')],[1,0]],
-    [['b','c'].sort().join('|')],[3,0]],
+    [['a','b'].sort().join('|'),[2,0]],
+    [['a','c'].sort().join('|'),[1,0]],
+    [['b','c'].sort().join('|'),[3,0]],
   ]);
-  for(const fixture of fixtures){
-    const key=[fixture.homeId,fixture.awayId].sort().join('|'),winnerScore=scoreByPair.get(key);
-    const sorted=[fixture.homeId,fixture.awayId].sort(),firstWon=winnerScore[0]>winnerScore[1];
+  for(const fixture of league.fixtures){
+    const key=[fixture.homeId,fixture.awayId].sort().join('|'),score=scoreByPair.get(key),sorted=[fixture.homeId,fixture.awayId].sort();
     let homeGoals,awayGoals;
-    if(sorted[0]===fixture.homeId){[homeGoals,awayGoals]=winnerScore;}else{[awayGoals,homeGoals]=winnerScore;}
+    if(sorted[0]===fixture.homeId){[homeGoals,awayGoals]=score;}else{[awayGoals,homeGoals]=score;}
     league=recordCompetitionResult(league,{fixtureId:fixture.id,homeGoals,awayGoals});
   }
   const table=calculateStandings(league);
