@@ -1,4 +1,5 @@
 import {developmentStage,applySeasonalAgeDecline} from './career-development.js';
+import {synchronizeCareerContract} from './career-contract-v1.js';
 
 const MS_DAY=24*60*60*1000;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -76,6 +77,7 @@ export function initializeCareerTime(state,{startDate=null}={}){
   for(const club of Object.values(state.world||{}))for(const player of club.roster||[])anchorPlayerBirthDate(player,currentDate,i++);
   anchorPlayerBirthDate(state.player,currentDate,i);
   syncDevelopmentProfile(state.player);
+  synchronizeCareerContract(state);
   return state.clock;
 }
 
@@ -86,6 +88,7 @@ export function advanceCareerDays(state,days=7){
   state.clock.elapsedDays=(state.clock.elapsedDays||0)+amount;
   state.clock.lastAdvanceDays=amount;
   synchronizeCareerAges(state);
+  synchronizeCareerContract(state);
   return state.clock;
 }
 
@@ -105,7 +108,10 @@ function applySeasonAgeCurve(state,season){
 export function rollCareerToSeasonStart(state,season=state?.season||1){
   if(!state?.clock)initializeCareerTime(state);
   const target=careerSeasonStartDate(state.countryId,season),gap=daysBetweenISO(state.clock.currentDate,target);
-  if(gap>0)advanceCareerDays(state,gap);else synchronizeCareerAges(state);
+  if(gap>0)advanceCareerDays(state,gap);else{
+    synchronizeCareerAges(state);
+    synchronizeCareerContract(state);
+  }
   applySeasonAgeCurve(state,season);
   return state.clock;
 }

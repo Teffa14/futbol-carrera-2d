@@ -67,6 +67,7 @@ export function expirePlayerContract(contract,currentDate){
   if(!contract)return null;
   const snapshot=contractSnapshot(contract,currentDate);
   if(snapshot.status!=='free-agent')return{...contract};
+  if(contract.status==='expired')return{...contract};
   return{...contract,status:'expired',expiredAt:isoDate(currentDate)};
 }
 
@@ -88,8 +89,26 @@ export function ensureCareerContract(state,{defaultSeasons=2,defaultWeeklyWage=0
   if(!state||typeof state!=='object')return null;
   if(state.contract)return state.contract;
   const clubId=state.clubId||null;
-  const startDate=state.currentDate||state.calendar?.currentDate||state.createdDate||null;
+  const startDate=state.clock?.currentDate||state.currentDate||state.calendar?.currentDate||state.createdDate||null;
   if(!clubId||!startDate)return null;
   state.contract=createPlayerContract({clubId,startDate,seasons:defaultSeasons,weeklyWage:defaultWeeklyWage,squadRole:'prospect'});
   return state.contract;
+}
+
+export function synchronizeCareerContract(state,{defaultSeasons=2,defaultWeeklyWage=0}={}){
+  if(!state||typeof state!=='object')return null;
+  const currentDate=state.clock?.currentDate||state.currentDate||state.calendar?.currentDate||null;
+  if(!currentDate)return null;
+  const contract=ensureCareerContract(state,{defaultSeasons,defaultWeeklyWage});
+  if(!contract){
+    state.contractStatus={status:'free-agent',clubId:null,daysRemaining:0,expiring:false,canNegotiate:true};
+    return state.contractStatus;
+  }
+  state.contract=expirePlayerContract(contract,currentDate);
+  const snapshot=contractSnapshot(state.contract,currentDate);
+  state.contractStatus={
+    ...snapshot,
+    clubId:snapshot.status==='active'||snapshot.status==='future'?state.contract.clubId:null,
+  };
+  return state.contractStatus;
 }
