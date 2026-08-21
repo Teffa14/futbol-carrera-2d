@@ -1,6 +1,5 @@
 import './training-framework-v2.js';
 import './kick-direction.js';
-import './physical-technique-v1.js';
 import './oriented-reception-v2.js';
 import {TrainingMatchEngine,TRAINING_MATCH_ENGINE_VERSION} from './training-match-engine-latest.js';
 
