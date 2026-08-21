@@ -62,6 +62,29 @@ export function coachTrustAssessment({
   };
 }
 
+export function ensureCareerAuthority(state){
+  if(!state||typeof state!=='object')return null;
+  const current=state.authority&&typeof state.authority==='object'?state.authority:{};
+  state.authority={
+    coachTrust:clamp(n(current.coachTrust,25),0,100),
+    tacticalInfluence:clamp(n(current.tacticalInfluence,0),0,100),
+    coachAssessments:Array.isArray(current.coachAssessments)?current.coachAssessments:[],
+  };
+  return state.authority;
+}
+
+export function applyCoachTrustToCareer(state,{matchRating=6,tacticalRating=6,errorCost=0,appeared=true,fixtureId=null,date=null}={}){
+  const authority=ensureCareerAuthority(state);
+  if(!authority)return null;
+  const result=coachTrustAssessment({currentTrust:authority.coachTrust,matchRating,tacticalRating,errorCost,appeared});
+  authority.coachTrust=result.after;
+  if(appeared){
+    authority.coachAssessments.push({fixtureId,date,...result});
+    if(authority.coachAssessments.length>30)authority.coachAssessments.splice(0,authority.coachAssessments.length-30);
+  }
+  return result;
+}
+
 export function authorityPermissions({coachTrust=0,tacticalInfluence=0}={}){
   const trust=clamp(n(coachTrust),0,100),influence=clamp(n(tacticalInfluence),0,100);
   const roleSecurity=trust>=72?'trusted':trust>=48?'established':trust>=28?'fragile':'unproven';
