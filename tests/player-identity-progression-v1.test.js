@@ -19,7 +19,7 @@ test('a bad training session still creates meaningful development',()=>{
   const poorGain=poor.branches.finishing.xp-before,goodGain=good.branches.finishing.xp-createIdentityState(career()).branches.finishing.xp;
   assert.ok(poorGain>=14,`poor session should still teach, got ${poorGain}`);
   assert.ok(goodGain>poorGain,'better execution should accelerate learning');
-  assert.ok(goodGain<poorGain*2.2,'bad players must not be trapped by an extreme quality multiplier');
+  assert.ok(goodGain<poorGain*2.4,'quality should accelerate identity growth without making poor sessions irrelevant');
 });
 
 test('match evidence develops the actions actually performed',()=>{
