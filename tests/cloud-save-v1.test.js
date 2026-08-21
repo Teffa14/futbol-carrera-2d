@@ -7,6 +7,7 @@ import {fileURLToPath} from 'node:url';
 const testsDir=path.dirname(fileURLToPath(import.meta.url));
 const root=path.resolve(testsDir,'..');
 const cloud=fs.readFileSync(path.join(root,'cloud-save-v1.js'),'utf8');
+const cloudUi=fs.readFileSync(path.join(root,'cloud-save-ui-v1.js'),'utf8');
 const index=fs.readFileSync(path.join(root,'index.html'),'utf8');
 const migration=fs.readFileSync(path.join(root,'supabase/migrations/202608210001_create_career_saves.sql'),'utf8');
 const pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8'));
@@ -19,28 +20,56 @@ test('cloud save points at the South America production project with only a publ
   assert.doesNotMatch(cloud,/sb_secret_/i);
 });
 
-test('local career storage remains the first durable save and cloud upload is secondary',()=>{
-  assert.match(cloud,/STORE_KEY/);
-  assert.match(cloud,/nativeSetItem\.call\(this,key,value\)/);
-  assert.match(cloud,/queueUpload\(\)/);
-  assert.match(cloud,/catch\(setError\)/);
+test('cloud save uses a high-entropy recovery credential instead of personal identity',()=>{
+  assert.match(cloud,/crypto\.getRandomValues\(new Uint8Array\(32\)\)/);
+  assert.match(cloud,/crypto\.randomUUID\(\)/);
+  assert.match(cloud,/`CE1\.\$\{c\.saveId\}\.\$\{c\.secret\}`/);
+  assert.doesNotMatch(cloud,/signInAnonymously/);
+  assert.doesNotMatch(cloud,/signInWithOtp/);
+  assert.doesNotMatch(cloudUi,/type=["']email["']/i);
+  assert.doesNotMatch(cloudUi,/type=["']tel["']/i);
 });
 
-test('cloud save installs before app so every career write can be mirrored',()=>{
+test('cloud save observes the existing local save without replacing Storage methods',()=>{
+  assert.match(cloud,/localStorage\.getItem\(STORE_KEY\)/);
+  assert.match(cloud,/setInterval\(observeLocalSave,POLL_MS\)/);
+  assert.match(cloud,/queueUpload\(\)/);
+  assert.doesNotMatch(cloud,/Storage\.prototype\.setItem\s*=/);
+  assert.doesNotMatch(cloud,/Storage\.prototype\.removeItem\s*=/);
+});
+
+test('recovery secret is hashed server-side and the table is not directly exposed',()=>{
+  assert.match(migration,/secret_hash bytea not null/i);
+  assert.match(migration,/digest\(convert_to\(p_secret,'UTF8'\),'sha256'\)/i);
+  assert.match(migration,/enable row level security/i);
+  assert.match(migration,/revoke all on table public\.career_saves from anon, authenticated/i);
+  assert.doesNotMatch(migration,/user_id/i);
+  assert.doesNotMatch(migration,/auth\.uid\(\)/i);
+});
+
+test('only guarded RPC functions are executable by browser roles',()=>{
+  assert.match(migration,/security definer/ig);
+  assert.match(migration,/grant execute on function public\.career_save_write[\s\S]*to anon, authenticated/i);
+  assert.match(migration,/grant execute on function public\.career_save_read[\s\S]*to anon, authenticated/i);
+  assert.match(migration,/grant execute on function public\.career_save_delete[\s\S]*to anon, authenticated/i);
+  assert.match(migration,/pg_column_size\(p_save_data\) > 5242880/i);
+});
+
+test('cloud runtime loads before app and recovery UI loads after app',()=>{
   const cloudAt=index.indexOf("import './cloud-save-v1.js';");
   const appAt=index.indexOf("import './app.js';");
-  assert.ok(cloudAt>=0,'cloud save module must be imported');
-  assert.ok(appAt>=0,'app module must be imported');
-  assert.ok(cloudAt<appAt,'cloud save module must run before app.js');
+  const uiAt=index.indexOf("import './cloud-save-ui-v1.js';");
+  assert.ok(cloudAt>=0&&appAt>=0&&uiAt>=0);
+  assert.ok(cloudAt<appAt,'cloud runtime should start before app');
+  assert.ok(appAt<uiAt,'cloud UI should attach after app');
 });
 
-test('career_saves enforces row level security by authenticated user id',()=>{
-  assert.match(migration,/enable row level security/i);
-  assert.match(migration,/auth\.uid\(\)/);
-  assert.match(migration,/for select[\s\S]*to authenticated/i);
-  assert.match(migration,/for insert[\s\S]*to authenticated/i);
-  assert.match(migration,/for update[\s\S]*to authenticated/i);
-  assert.match(migration,/for delete[\s\S]*to authenticated/i);
+test('cloud UI exposes copy, sync, and cross-device recovery actions',()=>{
+  assert.match(cloudUi,/Copiar código/);
+  assert.match(cloudUi,/Sincronizar ahora/);
+  assert.match(cloudUi,/Recuperar carrera/);
+  assert.match(cloudUi,/Guardá este código fuera del juego/);
+  assert.match(cloud,/restoreWithRecoveryCode/);
 });
 
 test('Supabase browser client version is pinned',()=>{
