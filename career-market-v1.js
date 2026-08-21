@@ -57,6 +57,7 @@ export function assessClubInterest({
   const need=clamp(num(squadNeed,50),0,100);
   const prestige=clamp(num(club.prestige,club.reputation||75),50,100);
   const clubReputation=clamp(num(club.reputation,76+(prestige-70)*.22),50,100);
+  const levelGap=Math.round(rating-Math.max(45,clubReputation-12));
 
   const components={
     levelFit:levelFit(rating,clubReputation),
@@ -68,15 +69,17 @@ export function assessClubInterest({
   };
   const score=clamp(Math.round(54+Object.values(components).reduce((sum,value)=>sum+value,0)),0,100);
   const threshold=contractStatus.status==='free-agent'?46:contractStatus.expiring||contractStatus.canNegotiate?50:58;
-  const interested=score>=threshold;
+  const sportingEligible=levelGap>=-14;
+  const interested=sportingEligible&&score>=threshold;
   return{
     clubId:String(club.id||''),
     score,
     threshold,
     interested,
+    sportingEligible,
     components,
     projectedRole:roleFromScore(score,rating,clubReputation),
-    levelGap:Math.round(rating-Math.max(45,clubReputation-12)),
+    levelGap,
   };
 }
 
