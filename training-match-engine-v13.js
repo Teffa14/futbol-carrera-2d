@@ -48,6 +48,7 @@ function reconcilePhysicalExecution(e){
   if(id==='st-box-duel'){
     if(q.customStage==='turn'&&e.ball.lastPlayerId===e.player.id&&(e.ball.x>775||stageAge(e)>.95)){
       if(!q.turnComplete){q.turnComplete=true;m.duelsBeaten=(m.duelsBeaten||0)+1;e.flashTraining('GIRO LIMPIO');}
+      q.repTerminal=false;q.repTerminalAt=null;q.repSuccess=false;
       q.customStage='finish';q.stageAt=e.time;
       return;
     }
@@ -75,6 +76,7 @@ function reconcilePhysicalExecution(e){
 
 export class TrainingMatchEngine extends TrainingMatchEngineV12{
   constructor(drill,result,player){super(drill,result,player);this.trainingEngineVersion=13;}
+  resetRep(rep,initial=false){return super.resetRep(rep,initial);}
   scenario(dt){
     const out=super.scenario(dt);
     reconcilePhysicalExecution(this);
