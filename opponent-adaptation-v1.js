@@ -68,6 +68,30 @@ export function deceptionWindow(state,{opponentId,context='general',actualBehavi
   return{surprise:round3(surprise),expected:adaptation.expected,actual:id(actualBehavior),reactionDelayMs:Math.round(70+surprise*260)};
 }
 
+export function classifyWideBehavior({attacker,attackDirection=1,centerY=0}={}){
+  if(!attacker)return null;
+  const vx=Number(attacker.vx)||0,vy=Number(attacker.vy)||0,dir=attackDirection>=0?1:-1;
+  const towardCenter=Math.sign(Number(centerY)-Number(attacker.y||0));
+  if(Math.abs(vy)>.12&&towardCenter&&Math.sign(vy)===towardCenter)return'cut-inside';
+  if(Math.abs(vy)>.12&&towardCenter&&Math.sign(vy)===-towardCenter)return'go-outside';
+  if(vx*dir>.12)return'drive-forward';
+  return'hold';
+}
+
+export function defensiveResponseTarget(state,{opponentId,context='general',defenderIntelligence=65,scoutingKnowledge=0,defender,attacker,attackDirection=1,centerY=0}={}){
+  if(!defender||!attacker)return null;
+  const adaptation=defenderAdaptation(state,{opponentId,context,defenderIntelligence,scoutingKnowledge});
+  if(!adaptation.expected||adaptation.confidence<.18)return null;
+  const dir=attackDirection>=0?1:-1,inside=Math.sign(Number(centerY)-Number(attacker.y||0))||1;
+  const laneOffset=4+adaptation.commitment*10,depthOffset=4+adaptation.commitment*7;
+  let x=Number(attacker.x)||0,y=Number(attacker.y)||0,mode='contain';
+  if(adaptation.expected==='cut-inside'){x+=dir*depthOffset;y+=inside*laneOffset;mode='protect-inside';}
+  else if(adaptation.expected==='go-outside'){x+=dir*depthOffset;y-=inside*laneOffset;mode='protect-outside';}
+  else if(adaptation.expected==='drive-forward'){x+=dir*(depthOffset+3);mode='protect-depth';}
+  else{x+=dir*depthOffset*.65;mode='contain';}
+  return{x:round3(x),y:round3(y),mode,expected:adaptation.expected,confidence:adaptation.confidence,commitment:adaptation.commitment};
+}
+
 export function decayOpponentAdaptation(state,{currentTick,halfLifeTicks=900}={}){
   const root=ensureOpponentAdaptation(state);if(!root)return null;
   const now=Math.max(root.matchTick,Number(currentTick)||root.matchTick);root.matchTick=now;
