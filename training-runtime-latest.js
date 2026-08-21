@@ -4,7 +4,7 @@ import {TrainingMatchEngine,TRAINING_MATCH_ENGINE_VERSION} from './training-matc
 export const TRAINING_RUNTIME_VERSIONS=Object.freeze({
   matchEngine:TRAINING_MATCH_ENGINE_VERSION,
   framework:2,
-  authoritativeScenarios:TRAINING_MATCH_ENGINE_VERSION,
+  authoritativeScenarios:3,
   liveUi:5,
 });
 
