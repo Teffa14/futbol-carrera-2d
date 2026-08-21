@@ -1,5 +1,6 @@
 name: Deploy Career Eleven to Vercel
 
+# Production deploy trigger. Keep this workflow on main so every later main push can publish the verified static artifact.
 on:
   push:
     branches:
