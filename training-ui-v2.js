@@ -19,6 +19,23 @@ export function trainingHomeMarkup(state){
   ensureTrainingMemory(state);const catalog=trainingCatalogFor(state.player),recommended=new Set(recommendedTrainingDrills(state.player,3)),family=trainingFamily(state.player.position),stats=keyStats(state.player,catalog),groups=[...new Set(catalog.map(d=>d.category))];
   return `<div id="training-v2-home"><header class="tr2-head"><div><div class="eyebrow">CENTRO DE ENTRENAMIENTO · ${FAMILY_NAME[family]}</div><h1>Entrená tu posición</h1><p>Los ejercicios cambian según rol y stats. Cada sesión desarrolla ejecución, memoria e identidad; una mala sesión sigue enseñando fundamentos.</p></div><div class="tr2-sessions"><b>${state.progress.trainingPoints}</b><span>sesiones disponibles</span></div></header><section class="tr2-stats">${stats.map(k=>`<div class="tr2-stat ${(state.player[k]||50)<60?'low':''}"><span>${esc(attrLabel(k))}</span><b>${state.player[k]??'—'}</b></div>`).join('')}</section><div class="tr2-note"><b>Cómo se evalúa:</b> cada ejercicio tiene marcadores propios. El éxito de la repetición importa, pero también perfil, timing, lectura, control, trayectoria, presión o cobertura según el trabajo.</div><div class="tr2-groups">${groups.map(g=>{const rows=catalog.filter(d=>d.category===g);return `<section><div class="tr2-group-head"><h2>${esc(g)}</h2><span>${rows.length} ejercicio(s)</span></div><div class="tr2-grid">${rows.map(d=>card(state,d,recommended)).join('')}</div></section>`;}).join('')}</div></div>`;
 }
-export function decorateTrainingHome(){if(typeof document==='undefined')return;style();const active=document.querySelector('.nav-btn.on[data-view="training"]'),main=document.querySelector('.main');if(!active||!main||document.querySelector('#trainingCanvas')||document.querySelector('#training-v2-home'))return;const state=loadCareer();if(!state)return;main.innerHTML=trainingHomeMarkup(state);}
-if(typeof document!=='undefined'){new MutationObserver(decorateTrainingHome).observe(document.querySelector('#app')||document.body,{subtree:true,childList:true});queueMicrotask(decorateTrainingHome);}
-export const __trainingUiV2={trainingHomeMarkup,decorateTrainingHome,keyStats};
+export function renderTrainingHomeNow(doc=globalThis.document){
+  if(!doc)return false;style();const main=doc.querySelector('.main'),state=loadCareer();if(!main||!state)return false;
+  for(const b of doc.querySelectorAll('.nav-btn[data-view]'))b.classList.toggle('on',b.dataset.view==='training');
+  doc.body?.classList.remove('match-live-active','training-live-v5','training-live-active');
+  main.innerHTML=trainingHomeMarkup(state);return true;
+}
+export function decorateTrainingHome(){
+  if(typeof document==='undefined')return;const active=document.querySelector('.nav-btn.on[data-view="training"]');
+  if(!active||document.querySelector('#trainingCanvas')||document.querySelector('#training-v2-home'))return;
+  renderTrainingHomeNow(document);
+}
+export function interceptTrainingNavigation(event){
+  const button=event?.target?.closest?.('[data-view="training"]');if(!button)return false;
+  event.preventDefault?.();event.stopImmediatePropagation?.();return renderTrainingHomeNow(document);
+}
+if(typeof document!=='undefined'){
+  document.addEventListener('click',interceptTrainingNavigation,true);
+  queueMicrotask(()=>{if(document.querySelector('.nav-btn.on[data-view="training"]'))renderTrainingHomeNow(document);});
+}
+export const __trainingUiV2={trainingHomeMarkup,decorateTrainingHome,renderTrainingHomeNow,interceptTrainingNavigation,keyStats};
