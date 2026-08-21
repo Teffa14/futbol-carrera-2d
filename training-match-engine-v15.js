@@ -4,6 +4,7 @@ export const TRAINING_MATCH_ENGINE_VERSION=15;
 
 const GOAL={x:1045,top:295,bottom:405};
 const unit=(x,y)=>{const d=Math.hypot(x,y)||1;return{x:x/d,y:y/d};};
+const dist=(a,b)=>Math.hypot((a?.x??0)-(b?.x??0),(a?.y??0)-(b?.y??0));
 
 function resolveSuccessfulRep(engine,text,reason){
   const q=engine.trainingQualityV6;
@@ -39,8 +40,10 @@ export class TrainingMatchEngine extends TrainingMatchEngineV14{
       if(carrier&&wide){
         const side=q.side||1;
         this.resetActor(wide,825,350+side*115,'RB');
-        const bx=865,by=350,d=unit(wide.x-bx,wide.y-by),contact=carrier.r+this.ball.r+1.2;
-        this.resetActor(carrier,bx-d.x*contact,by-d.y*contact,'CB');
+        const bx=865,by=350,d=unit(wide.x-bx,wide.y-by),contact=carrier.r+this.ball.r-.55;
+        this.resetActor(carrier,bx-d.x*(contact+1.2),by-d.y*(contact+1.2),'CB');
+        carrier.facingX=d.x;carrier.facingY=d.y;carrier.desiredFacingX=d.x;carrier.desiredFacingY=d.y;
+        carrier.kickCooldown=0;carrier.touchCooldown=0;
         this.resetBall(bx,by);
         q.wideTarget={x:wide.x,y:wide.y};
         q.possessionId=carrier.id;
@@ -68,6 +71,12 @@ export class TrainingMatchEngine extends TrainingMatchEngineV14{
         q.stageAt=this.time;
         q.phase='Atacar devolución';
       }
+    }
+
+    if(id==='st-press'&&q.customStage==='screen'&&!q.repTerminal&&dist(this.player,q.screen)<10){
+      q.customStage='force-wide';
+      q.stageAt=this.time;
+      q.phase='2. Orientar a banda';
     }
 
     return out;
