@@ -1,0 +1,76 @@
+name: Deploy Career Eleven to Vercel
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: career-eleven-vercel-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VERCEL_ORG_ID: team_Ch0YhVIbdeOyZrb6zKrdYYWC
+      VERCEL_PROJECT_ID: prj_IBNlWUiiTAcv30ZZ8lfhaV22Ejd9
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Require Vercel credential
+        shell: bash
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "VERCEL_TOKEN is not configured for this repository." >&2
+            exit 1
+          fi
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate source
+        run: npm run check
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build self-contained production artifact
+        run: npm run build
+
+      - name: Verify public artifact is source-repository blind
+        shell: bash
+        run: |
+          test -s dist/index.html
+          test "$(wc -c < dist/index.html)" -lt 26214400
+          if grep -Eqi 'raw\.githubusercontent\.com/Teffa14|github\.com/Teffa14|api\.github\.com/repos/Teffa14|Teffa14/futbol-carrera-2d' dist/index.html; then
+            echo "Production artifact leaks the source repository." >&2
+            exit 1
+          fi
+
+      - name: Link exact Vercel project
+        shell: bash
+        run: |
+          mkdir -p .vercel
+          cat > .vercel/project.json <<JSON
+          {"orgId":"$VERCEL_ORG_ID","projectId":"$VERCEL_PROJECT_ID","projectName":"futbol-carrera-2d"}
+          JSON
+
+      - name: Pull production environment
+        run: npx --yes vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: Build Vercel static output
+        run: npx --yes vercel@latest build --prod --token="$VERCEL_TOKEN"
+
+      - name: Deploy to production
+        run: npx --yes vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN"
