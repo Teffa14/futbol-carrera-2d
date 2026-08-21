@@ -1,111 +1,60 @@
 import {TrainingMatchEngine as TrainingMatchEngineV12} from './training-match-engine-v12.js';
+import {wallPositions,CROSSBAR_HEIGHT} from './set-piece-height-v2.js';
 
 export const TRAINING_MATCH_ENGINE_VERSION=13;
 
-const EXECUTION_DRILLS=new Set(['st-profile-finish','st-one-touch','st-run-behind','st-wall-run','st-box-duel','st-press','st-free-kick']);
-const FIELD={right:1045,goalTop:295,goalBottom:405,centerY:350};
+const FIELD={left:55,right:1045,top:45,bottom:655,goalTop:295,goalBottom:405,centerX:550,centerY:350};
+const IDS=new Set(['st-profile-finish','st-one-touch','st-run-behind','st-wall-run','st-box-duel','st-press','st-free-kick']);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const dist=(a,b)=>Math.hypot((a?.x??0)-(b?.x??0),(a?.y??0)-(b?.y??0));
 const unit=(x,y)=>{const d=Math.hypot(x,y)||1;return{x:x/d,y:y/d};};
+const speed=b=>Math.hypot(b?.vx||0,b?.vy||0);
 
-function stageAge(e){
-  const q=e.trainingQualityV6;
-  return Math.max(0,e.time-(q?.stageAt??e.repStart));
-}
+function hold(e,p,target,dt){if(p&&target)e.move(p,target,dt);}
+function face(e,p,target,dt){if(!p||!target)return;const d=unit(target.x-p.x,target.y-p.y);e.turnPlayer(p,d,dt);}
+function stage(e,name){e.trainingQualityV6.customStage=name;e.trainingQualityV6.stageAt=e.time;}
+function age(e){return Math.max(0,e.time-(e.trainingQualityV6.stageAt??e.repStart));}
+function resetBall(e,x,y){e.resetBall(x,y);Object.assign(e.ball,{z:0,vz:0,spin:0,setPieceAerial:null,setPieceCurve:null,crossbarMissLogged:false,trainingDirectPass:false});}
+function terminal(e,success,text,reason=text){const q=e.trainingQualityV6;if(q.repTerminal)return;q.repSuccess=!!success;q.repTerminal=true;q.repTerminalAt=e.time;q.terminalReason=reason;e.flashTraining(text);}
+function keeperTouch(e,keeper,tick){return !!keeper&&e.ball.lastPlayerId===keeper.id&&(e.ball.lastTouchTick??-1)>tick;}
+function inGoalMouth(e){return e.ball.y>FIELD.goalTop&&e.ball.y<FIELD.goalBottom&&(e.ball.z||0)<=CROSSBAR_HEIGHT;}
+function goalTarget(keeper,side=1){const keeperY=keeper?.y??FIELD.centerY;let y=side<0?330:370;if(Math.abs(keeperY-y)<28)y=side<0?372:328;return{x:FIELD.right+25,y};}
+function markShot(e,q){if(q.shotTick!=null)return;const k=e.lastTrainingKick;if(k?.rep===e.rep&&k.by===e.player.id&&(k.kind==='shot'||k.kind==='free-kick')){q.shotTick=k.tick;q.shotTime=e.time;e.ball.trainingDirectPass=false;}}
+function shotOutcome(e,q,keeper){if(q.shotTick==null)return null;if(e.ball.x>FIELD.right+8&&inGoalMouth(e))return{success:true,text:'GOL',reason:'goal'};if(keeperTouch(e,keeper,q.shotTick))return{success:true,text:'AL ARCO',reason:'save'};const elapsed=e.time-(q.shotTime??e.time);if(e.ball.x>FIELD.right-3)return{success:inGoalMouth(e),text:inGoalMouth(e)?'AL ARCO':'AFUERA',reason:inGoalMouth(e)?'on-target':'wide'};if(elapsed>.38&&speed(e.ball)<.28)return{success:false,text:'REMATE CORTO',reason:'dead'};if(elapsed>2.25)return{success:false,text:'AFUERA',reason:'timeout'};return null;}
+function physicalKick(e,p,target,power,kind,dt,{direct=false,receiver=null,meta={}}={}){const last=e.lastTrainingKick;if(last?.rep===e.rep&&last.by===p.id&&last.kind===kind)return true;const d=unit(target.x-e.ball.x,target.y-e.ball.y),contact=p.r+e.ball.r-.55,spot={x:e.ball.x-d.x*(contact+1.2),y:e.ball.y-d.y*(contact+1.2)},facing=(p.facingX||0)*d.x+(p.facingY||0)*d.y;if(dist(p,spot)>3.4||facing<.975){p.kickIntent=null;hold(e,p,spot,dt);e.turnPlayer(p,d,dt);return false;}if(!p.kickIntent){if(direct)e.ball.trainingDirectPass=true;const type=(kind==='shot'||kind==='free-kick')?'shot':'pass';e.armKick(p,target,power,type,{receiverId:receiver?.id||null,trainingKind:kind,...meta});}e.turnPlayer(p,d,dt);hold(e,p,{x:e.ball.x+d.x*18,y:e.ball.y+d.y*18},dt);return false;}
+function carryBehind(e,p,target,dt){const d=unit(target.x-e.ball.x,target.y-e.ball.y),contact=p.r+e.ball.r-.85,behind={x:e.ball.x-d.x*contact,y:e.ball.y-d.y*contact};face(e,p,target,dt);const along=(p.x-behind.x)*d.x+(p.y-behind.y)*d.y,lateral=Math.abs((p.x-behind.x)*(-d.y)+(p.y-behind.y)*d.x);if(along>3||lateral>4.5||dist(p,behind)>6){hold(e,p,behind,dt);return;}hold(e,p,{x:e.ball.x+d.x*34,y:e.ball.y+d.y*34},dt);}
+function common(e,objective){Object.assign(e.trainingQualityV6,{repTerminal:false,repTerminalAt:null,terminalReason:null,objective,shotTick:null,shotTime:null,serviceTick:-1,expectedDirectReceiverId:null,directReceiveTick:-1,directReceiveX:null,directReceiveY:null,freeKickFired:false});e.ball.trainingDirectPass=false;}
 
-function forceSuccess(e,text,reason){
-  const q=e.trainingQualityV6;
-  if(!q)return;
-  q.repSuccess=true;
-  q.repTerminal=true;
-  q.repTerminalAt=e.time;
-  q.terminalReason=reason||text;
-  e.flashTraining(text);
-}
+function setupProfile(e,rep){const side=rep%2?1:-1,[server]=e.mates,[marker,keeper]=e.defenders;e.resetActor(server,565,FIELD.centerY+side*118,'CM');e.resetActor(e.player,690,FIELD.centerY+side*55,'ST');e.resetActor(marker,820,FIELD.centerY-side*105,'CB');e.resetActor(keeper,FIELD.right-27,FIELD.centerY-side*18,'GK');resetBall(e,server.x+18,server.y);common(e,'Atacá un servicio diagonal, recibí con el cuerpo abierto y perfilate detrás de la pelota antes de definir.');Object.assign(e.trainingQualityV6,{receive:{x:750,y:FIELD.centerY+side*34},side,possessionId:server.id});stage(e,'arrive');e.repOrigin={px:e.player.x,py:e.player.y,bx:e.ball.x,by:e.ball.y};}
+function profileScenario(e,dt){const q=e.trainingQualityV6,[server]=e.mates,[marker,keeper]=e.defenders;if(q.repTerminal)return;hold(e,keeper,{x:FIELD.right-27,y:clamp(e.ball.y,FIELD.goalTop+18,FIELD.goalBottom-18)},dt);hold(e,marker,{x:clamp(e.player.x-18,790,850),y:FIELD.centerY-q.side*108},dt);if(q.customStage==='arrive'){q.phase='Llegar perfilado';hold(e,e.player,q.receive,dt);face(e,e.player,{x:FIELD.right,y:FIELD.centerY},dt);if(dist(e.player,q.receive)<15||age(e)>.55)stage(e,'service');return;}if(q.customStage==='service'){q.phase='Servicio diagonal';hold(e,e.player,q.receive,dt);face(e,e.player,{x:FIELD.right,y:FIELD.centerY},dt);if(physicalKick(e,server,q.receive,2.35,'service',dt,{receiver:e.player})){q.serviceTick=e.tick;e.pending(server,e.player,'service');stage(e,'receive');}return;}if(q.customStage==='receive'){q.phase='Recibir de costado';const intercept=e.projectedIntercept(e.player);hold(e,e.player,{x:clamp(intercept.x,q.receive.x-10,q.receive.x+24),y:clamp(intercept.y,q.receive.y-25,q.receive.y+25)},dt);face(e,e.player,{x:FIELD.right,y:FIELD.centerY},dt);e.observeTouches();if(e.ball.lastPlayerId===e.player.id&&(e.ball.lastTouchTick??-1)>q.serviceTick){stage(e,'finish');e.flashTraining('PERFIL ABIERTO');}else if(age(e)>2.2)terminal(e,false,'PASE PERDIDO','service-missed');return;}if(q.customStage==='finish'){q.phase='Perfilar y definir';const target=goalTarget(keeper,q.side);if(speed(e.ball)>.95&&age(e)<.55){face(e,e.player,target,dt);return;}physicalKick(e,e.player,target,6.55,'shot',dt);markShot(e,q);if(q.shotTick!=null)stage(e,'flight');return;}q.phase='Resolver remate';const out=shotOutcome(e,q,keeper);if(out)terminal(e,out.success,out.text,out.reason);}
 
-function ensureBoxFinishContact(e,dt){
-  const q=e.trainingQualityV6,[def,keeper]=e.defenders;
-  if(q.customStage!=='finish'||q.shotTick!=null)return;
-  if(def)e.move(def,{x:Math.max(790,e.player.x-56),y:e.player.y+(q.duelSide||1)*44},dt);
-  const target={x:FIELD.right+26,y:(keeper?.y??FIELD.centerY)<FIELD.centerY?FIELD.goalBottom-20:FIELD.goalTop+20};
-  const d=unit(target.x-e.ball.x,target.y-e.ball.y),contact=e.player.r+e.ball.r-.55;
-  const spot={x:e.ball.x-d.x*(contact+1.2),y:e.ball.y-d.y*(contact+1.2)};
-  e.turnPlayer(e.player,d,dt);
-  if(!e.player.kickIntent&&dist(e.player,spot)<4.8)e.armKick(e.player,target,7.25,'shot',{trainingKind:'shot'});
-  e.move(e.player,dist(e.player,spot)>4.8?spot:{x:e.ball.x+d.x*19,y:e.ball.y+d.y*19},dt);
-  const kick=e.lastTrainingKick;
-  if(kick?.rep===e.rep&&kick.by===e.player.id&&kick.kind==='shot'){
-    q.shotTick=kick.tick;q.shotTime=e.time;q.shotStartX=e.ball.x;
-  }
-}
+function setupOneTouch(e,rep){const side=rep%2?1:-1,[server]=e.mates,[marker,keeper]=e.defenders;e.resetActor(server,565,FIELD.centerY+side*128,'CM');e.resetActor(e.player,700,FIELD.centerY+side*55,'ST');e.resetActor(marker,845,FIELD.centerY-side*105,'CB');e.resetActor(keeper,FIELD.right-27,FIELD.centerY-side*20,'GK');resetBall(e,server.x+18,server.y);common(e,'Arrancá sin pelota, llegá estable al punto de remate y pegale en el primer contacto.');Object.assign(e.trainingQualityV6,{strike:{x:805,y:FIELD.centerY+side*18},side,possessionId:server.id});stage(e,'run');e.repOrigin={px:e.player.x,py:e.player.y,bx:e.ball.x,by:e.ball.y};}
+function oneTouchScenario(e,dt){const q=e.trainingQualityV6,[server]=e.mates,[marker,keeper]=e.defenders;if(q.repTerminal)return;hold(e,keeper,{x:FIELD.right-27,y:FIELD.centerY-q.side*20},dt);hold(e,marker,{x:850,y:FIELD.centerY-q.side*112},dt);if(q.customStage==='run'){q.phase='Atacar punto de remate';hold(e,e.player,q.strike,dt);face(e,e.player,goalTarget(keeper,q.side),dt);if(dist(e.player,q.strike)<12||age(e)>.72)stage(e,'serve');return;}if(q.customStage==='serve'){q.phase='Esperar el servicio';hold(e,e.player,q.strike,dt);face(e,e.player,goalTarget(keeper,q.side),dt);if(physicalKick(e,server,{x:q.strike.x+18,y:q.strike.y},2.7,'service',dt,{direct:true})){q.serviceTick=e.tick;q.expectedDirectReceiverId=e.player.id;e.pending(server,e.player,'service');stage(e,'strike');}return;}if(q.customStage==='strike'){q.phase='Rematar de primera';hold(e,e.player,q.strike,dt);const target=goalTarget(keeper,q.side);face(e,e.player,target,dt);if(!e.player.kickIntent)e.armKick(e.player,target,6.7,'shot',{trainingKind:'shot'});markShot(e,q);if(q.shotTick!=null){stage(e,'flight');return;}if(age(e)>2.2)terminal(e,false,'NO LLEGÓ','missed-service');return;}q.phase='Resolver remate';const out=shotOutcome(e,q,keeper);if(out)terminal(e,out.success,out.text,out.reason);}
 
-function reconcilePhysicalExecution(e,dt){
-  const id=e.drill?.id,q=e.trainingQualityV6,m=e.trainingMetricsV6;
-  if(!EXECUTION_DRILLS.has(id)||!q)return;
+function setupRunBehind(e,rep){const side=rep%2?1:-1,[passer]=e.mates,[d1,d2,keeper]=e.defenders;e.resetActor(passer,500,FIELD.centerY-side*92,'CAM');e.resetActor(e.player,650,FIELD.centerY+side*72,'ST');e.resetActor(d1,735,285,'CB');e.resetActor(d2,735,415,'CB');e.resetActor(keeper,FIELD.right-27,FIELD.centerY,'GK');resetBall(e,passer.x+18,passer.y);common(e,'Esperá onside fuera de la línea del pase. Cuando el compañero golpea, atacá el intervalo y recibí la pelota por delante de la defensa.');Object.assign(e.trainingQualityV6,{lineX:735,lead:{x:850,y:FIELD.centerY+side*12},wait:{x:692,y:FIELD.centerY+side*58},side,possessionId:passer.id});stage(e,'wait');e.repOrigin={px:e.player.x,py:e.player.y,bx:e.ball.x,by:e.ball.y};}
+function runBehindScenario(e,dt){const q=e.trainingQualityV6,m=e.trainingMetricsV6,[passer]=e.mates,[d1,d2,keeper]=e.defenders;if(q.repTerminal)return;hold(e,keeper,{x:FIELD.right-27,y:FIELD.centerY},dt);hold(e,d1,{x:q.lineX,y:285},dt);hold(e,d2,{x:q.lineX,y:415},dt);if(q.customStage==='wait'){q.phase='Esperar onside';hold(e,e.player,q.wait,dt);face(e,e.player,q.lead,dt);if(dist(e.player,q.wait)<13||age(e)>.6){m.timedRuns=(m.timedRuns||0)+1;stage(e,'release');}return;}if(q.customStage==='release'){q.phase='Golpeo del pase filtrado';hold(e,e.player,q.wait,dt);face(e,e.player,q.lead,dt);if(physicalKick(e,passer,q.lead,2.75,'through',dt,{direct:true})){q.serviceTick=e.tick;q.expectedDirectReceiverId=e.player.id;e.pending(passer,e.player,'through');stage(e,'attack');}return;}q.phase='Atacar la espalda';const intercept=e.projectedIntercept(e.player);hold(e,e.player,{x:Math.max(q.wait.x,intercept.x),y:clamp(intercept.y,245,455)},dt);face(e,e.player,q.lead,dt);if(q.directReceiveTick>q.serviceTick&&q.directReceiveX>q.lineX){m.throughReceptions=Math.max(1,m.throughReceptions||0);terminal(e,true,'PASE FILTRADO RECIBIDO','through-received');return;}if(age(e)>2.9)terminal(e,false,'NO LLEGÓ','through-missed');}
 
-  if(id==='st-profile-finish'){
-    if(q.shotTick!=null){forceSuccess(e,'PERFIL + REMATE','profiled-shot-executed');return;}
-    if(q.receiveTick>=0&&q.customStage==='profile'&&stageAge(e)>.72&&e.ball.lastPlayerId===e.player.id){
-      forceSuccess(e,'CONTROL ORIENTADO','profiled-reception-executed');
-      return;
-    }
-  }
+function setupWallRun(e,rep){const side=rep%2?1:-1,[mate]=e.mates,[d1,d2,keeper]=e.defenders;e.resetActor(mate,485,FIELD.centerY-side*42,'CAM');e.resetActor(e.player,650,FIELD.centerY+side*70,'ST');e.resetActor(d1,700,FIELD.centerY+side*30,'CB');e.resetActor(d2,780,FIELD.centerY-side*75,'CB');e.resetActor(keeper,FIELD.right-27,FIELD.centerY,'GK');resetBall(e,mate.x+18,mate.y);common(e,'Venite al apoyo, descargá de primera y girá. La devolución sólo sale cuando ya rompiste y siempre va delante de tu carrera.');Object.assign(e.trainingQualityV6,{support:{x:605,y:FIELD.centerY+side*35},breakHold:{x:710,y:FIELD.centerY+side*55},lead:{x:850,y:FIELD.centerY+side*10},lineX:780,side,possessionId:mate.id,wallTick:-1,returnTick:-1});stage(e,'check');e.repOrigin={px:e.player.x,py:e.player.y,bx:e.ball.x,by:e.ball.y};}
+function wallRunScenario(e,dt){const q=e.trainingQualityV6,m=e.trainingMetricsV6,[mate]=e.mates,[d1,d2,keeper]=e.defenders;if(q.repTerminal)return;hold(e,keeper,{x:FIELD.right-27,y:FIELD.centerY},dt);hold(e,d1,{x:700,y:FIELD.centerY+q.side*16},dt);hold(e,d2,{x:780,y:FIELD.centerY-q.side*78},dt);if(q.customStage==='check'){q.phase='Venir al apoyo';hold(e,e.player,q.support,dt);face(e,e.player,mate,dt);if(dist(e.player,q.support)<12||age(e)>.6)stage(e,'service');return;}if(q.customStage==='service'){q.phase='Pase al apoyo';hold(e,e.player,q.support,dt);face(e,e.player,mate,dt);if(physicalKick(e,mate,q.support,2.4,'service',dt,{direct:true})){q.serviceTick=e.tick;q.expectedDirectReceiverId=e.player.id;e.pending(mate,e.player,'service');stage(e,'layoff');}return;}if(q.customStage==='layoff'){q.phase='Descargar de primera';hold(e,e.player,q.support,dt);face(e,e.player,mate,dt);if(!e.player.kickIntent)e.armKick(e.player,{x:mate.x+8,y:mate.y},2.35,'pass',{trainingKind:'wall'});const k=e.lastTrainingKick;if(k?.rep===e.rep&&k.by===e.player.id&&k.kind==='wall'){q.wallTick=k.tick;e.ball.trainingDirectPass=true;q.expectedDirectReceiverId=mate.id;e.pending(e.player,mate,'wall');m.wallBeats=(m.wallBeats||0)+1;stage(e,'break');}else if(age(e)>2.1)terminal(e,false,'NO DESCARGÓ','layoff-missed');return;}if(q.customStage==='break'){q.phase='Girar y romper';hold(e,e.player,q.breakHold,dt);face(e,e.player,q.lead,dt);hold(e,mate,{x:500,y:mate.y},dt);face(e,mate,q.lead,dt);if(!mate.kickIntent&&q.directReceiveTick>q.wallTick)e.armKick(mate,q.lead,2.8,'pass',{trainingKind:'through'});const k=e.lastTrainingKick;if(k?.rep===e.rep&&k.by===mate.id&&k.kind==='through'){q.returnTick=k.tick;e.ball.trainingDirectPass=true;q.expectedDirectReceiverId=e.player.id;e.pending(mate,e.player,'through');stage(e,'attack-return');}else if(age(e)>2.5)terminal(e,false,'DEVOLUCIÓN TARDE','return-not-played');return;}q.phase='Atacar devolución al espacio';const intercept=e.projectedIntercept(e.player);hold(e,e.player,{x:Math.max(q.breakHold.x,intercept.x),y:clamp(intercept.y,245,455)},dt);face(e,e.player,q.lead,dt);if(q.directReceiveTick>q.returnTick&&q.directReceiveX>q.lineX){m.throughReceptions=Math.max(1,m.throughReceptions||0);terminal(e,true,'DESCARGA + RUPTURA','wall-run-complete');return;}if(age(e)>3)terminal(e,false,'DEVOLUCIÓN PERDIDA','return-missed');}
 
-  if(id==='st-one-touch'&&q.shotTick!=null){
-    forceSuccess(e,'REMATE DE PRIMERA','one-touch-shot-executed');
-    return;
-  }
+function setupBox(e,rep){const side=rep%2?1:-1,[def,keeper]=e.defenders;e.resetActor(e.player,715,FIELD.centerY+side*28,'ST');e.resetActor(def,742,FIELD.centerY-side*16,'CB');e.resetActor(keeper,FIELD.right-27,FIELD.centerY-side*16,'GK');const u=Math.round(((e.playerData?.physical||50)+(e.playerData?.ballControl||50))/2),o=clamp(Math.round(42+(u-42)*.42),42,64);Object.assign(def.data,{defense:o,physical:o,pace:Math.max(42,o-5)});resetBall(e,e.player.x+18,e.player.y);common(e,'Recibí con el central en el hombro, protegé el primer contacto y girá hacia el lado libre antes de rematar.');Object.assign(e.trainingQualityV6,{side,startY:e.ball.y,duelTick:e.tick,possessionId:e.player.id});stage(e,'shield');e.repOrigin={px:e.player.x,py:e.player.y,bx:e.ball.x,by:e.ball.y};}
+function boxScenario(e,dt){const q=e.trainingQualityV6,m=e.trainingMetricsV6,[def,keeper]=e.defenders;if(q.repTerminal)return;hold(e,keeper,{x:FIELD.right-27,y:clamp(e.ball.y,FIELD.goalTop+17,FIELD.goalBottom-17)},dt);if(q.shotTick!=null){const out=shotOutcome(e,q,keeper);if(out)terminal(e,out.success,out.text,out.reason);return;}if(e.ball.lastPlayerId===def.id&&(e.ball.lastTouchTick??-1)>q.duelTick){terminal(e,false,'PERDIÓ EL DUELO','duel-lost');return;}if(q.customStage==='shield'){q.phase='Central al hombro';const lane={x:780,y:FIELD.centerY+q.side*76};carryBehind(e,e.player,lane,dt);hold(e,def,{x:e.player.x+12,y:e.player.y-q.side*34},dt);if(age(e)>.48)stage(e,'turn');return;}if(q.customStage==='turn'){q.phase='Girar al lado libre';const lane={x:825,y:FIELD.centerY+q.side*86};carryBehind(e,e.player,lane,dt);hold(e,def,{x:e.player.x-6,y:e.player.y-q.side*38},dt);if(e.ball.x>770&&Math.abs(e.ball.y-q.startY)>28){m.duelsBeaten=(m.duelsBeaten||0)+1;stage(e,'finish');e.flashTraining('GIRO');}else if(age(e)>2.1)terminal(e,false,'SIN GIRO','turn-stalled');return;}q.phase='Definir tras el giro';hold(e,def,{x:e.player.x-38,y:e.player.y-q.side*35},dt);physicalKick(e,e.player,goalTarget(keeper,q.side),6.6,'shot',dt);markShot(e,q);}
 
-  if(id==='st-run-behind'&&q.serviceTick>=0&&e.ball.lastPlayerId===e.player.id&&e.ball.lastTouchTick>q.serviceTick){
-    m.throughReceptions=Math.max(1,m.throughReceptions||0);
-    forceSuccess(e,'PASE FILTRADO RECIBIDO','through-ball-physically-received');
-    return;
-  }
+function setupPress(e,rep){const side=rep%2?1:-1,[cover,wing]=e.mates,[carrier,wide,pivot,keeper]=e.defenders;e.resetActor(e.player,690,FIELD.centerY+side*12,'ST');e.resetActor(cover,735,FIELD.centerY-side*85,'CAM');e.resetActor(wing,735,FIELD.centerY+side*140,'RW');e.resetActor(carrier,860,FIELD.centerY+side*8,'CB');e.resetActor(wide,805,FIELD.centerY+side*160,'RB');e.resetActor(pivot,755,FIELD.centerY-side*80,'CM');e.resetActor(keeper,FIELD.right-27,FIELD.centerY,'GK');resetBall(e,carrier.x-18,carrier.y);common(e,'Tapá primero el pase interior. Después presioná de adentro hacia afuera, encerrá al lateral y obligalo a devolver hacia atrás.');Object.assign(e.trainingQualityV6,{side,possessionId:carrier.id,wideTick:-1});stage(e,'screen');e.repOrigin={px:e.player.x,py:e.player.y,bx:e.ball.x,by:e.ball.y};}
+function pressScenario(e,dt){const q=e.trainingQualityV6,m=e.trainingMetricsV6,[cover,wing]=e.mates,[carrier,wide,pivot,keeper]=e.defenders;if(q.repTerminal)return;hold(e,keeper,{x:FIELD.right-27,y:FIELD.centerY},dt);if([e.player,cover,wing].some(p=>e.ball.lastPlayerId===p.id&&(e.ball.lastTouchTick??-1)>q.wideTick)){m.recoveries=(m.recoveries||0)+1;terminal(e,true,'RECUPERACIÓN','recovery');return;}if(q.customStage==='screen'){q.phase='1. Tapar pase interior';hold(e,pivot,{x:755,y:FIELD.centerY-q.side*82},dt);hold(e,wide,{x:805,y:FIELD.centerY+q.side*160},dt);hold(e,cover,{x:760,y:FIELD.centerY-q.side*72},dt);hold(e,wing,{x:770,y:FIELD.centerY+q.side*125},dt);const point={x:805,y:carrier.y-q.side*34};hold(e,e.player,point,dt);face(e,e.player,carrier,dt);if(dist(e.player,point)<15||age(e)>.7)stage(e,'force-wide');return;}if(q.customStage==='force-wide'){q.phase='2. Orientar a banda';hold(e,e.player,{x:carrier.x-43,y:carrier.y-q.side*28},dt);face(e,e.player,carrier,dt);if(physicalKick(e,carrier,wide,2.45,'press-wide',dt,{direct:true})){q.wideTick=e.tick;q.expectedDirectReceiverId=wide.id;e.pending(carrier,wide,'press-wide');stage(e,'jump');}return;}if(q.customStage==='jump'){q.phase='3. Saltar sobre el lateral';const intercept=e.projectedIntercept(wide);hold(e,wide,intercept,dt);hold(e,e.player,{x:intercept.x-30,y:intercept.y-q.side*15},dt);hold(e,cover,{x:765,y:FIELD.centerY-q.side*70},dt);hold(e,wing,{x:780,y:FIELD.centerY+q.side*112},dt);if(q.directReceiveTick>q.wideTick){stage(e,'trap');e.flashTraining('ENCERRADO EN BANDA');}else if(age(e)>2.4)terminal(e,true,'PASE FORZADO AFUERA','forced-error');return;}q.phase='4. Forzar pase atrás';hold(e,e.player,{x:wide.x-26,y:wide.y-q.side*8},dt);face(e,e.player,wide,dt);hold(e,cover,{x:765,y:FIELD.centerY-q.side*68},dt);hold(e,wing,{x:785,y:FIELD.centerY+q.side*108},dt);if(dist(e.player,wide)<64){if(physicalKick(e,wide,{x:carrier.x-5,y:carrier.y},2.35,'press-release',dt,{direct:true})){terminal(e,true,'PASE ATRÁS FORZADO','forced-back');return;}}if(age(e)>2.7)terminal(e,false,'PRESIÓN TARDE','late');}
 
-  if(id==='st-wall-run'&&q.returnTick>=0&&e.ball.lastPlayerId===e.player.id&&e.ball.lastTouchTick>q.returnTick){
-    m.throughReceptions=Math.max(1,m.throughReceptions||0);
-    forceSuccess(e,'DESCARGA + RUPTURA','return-pass-physically-received');
-    return;
-  }
+function setupFreeKick(e,rep){const side=rep%2?1:-1,[w1,w2,w3,w4,keeper]=e.defenders,bx=785,by=FIELD.centerY;e.resetActor(keeper,FIELD.right-27,FIELD.centerY-side*24,'GK');resetBall(e,bx,by);const target={x:FIELD.right+25,y:side<0?330:370},direct=wallPositions(e.ball,target,3),wall=[w1,w2,w3,w4];for(let i=0;i<3;i++){const shift=side<0?22:-22;e.resetActor(wall[i],direct[i].x,direct[i].y+shift,'CB');}e.resetActor(w4,direct[1].x+38,direct[1].y+(side<0?26:-26),'CB');const d=unit(target.x-bx,target.y-by),contact=e.player.r+e.ball.r+8;e.resetActor(e.player,bx-d.x*contact,by-d.y*contact,'ST');common(e,'Elegí el palo libre y pateá por el corredor que deja la barrera. El intento termina en cuanto hay gol, atajada, bloqueo o remate afuera.');const plan={targetX:target.x,targetY:target.y,initialAim:{...target},side,spin:-side*.18,technique:clamp(Number(e.playerData?.shooting??65),35,99),launchVz:.47,startX:bx,startY:by,shotDir:d};Object.assign(e.trainingQualityV6,{freeKickPlan:plan,target,wallIds:new Set([w1.id,w2.id,w3.id,w4.id]),possessionId:e.player.id,side});stage(e,'profile');e.repOrigin={px:e.player.x,py:e.player.y,bx:e.ball.x,by:e.ball.y};}
+function freeKickScenario(e,dt){const q=e.trainingQualityV6,keeper=e.defenders[4];if(q.repTerminal)return;hold(e,keeper,{x:FIELD.right-27,y:FIELD.centerY-q.side*24},dt);if(q.freeKickFired&&q.wallIds?.has(e.ball.lastPlayerId)&&(e.ball.lastTouchTick??-1)>q.shotTick){terminal(e,false,'BARRERA','blocked');return;}if(q.customStage==='profile'){q.phase='Perfilar al palo libre';if(physicalKick(e,e.player,q.target,6.75,'free-kick',dt,{meta:{curvePlan:q.freeKickPlan,aerialPlan:q.freeKickPlan}})){q.freeKickFired=true;q.shotTick=e.lastTrainingKick.tick;q.shotTime=e.time;stage(e,'flight');}return;}q.phase='Trayectoria del tiro libre';if(e.ball.x>FIELD.right+8&&inGoalMouth(e)){terminal(e,true,'GOL','goal');return;}if(keeperTouch(e,keeper,q.shotTick)){terminal(e,true,'ATAJADO','save');return;}const elapsed=e.time-(q.shotTime??e.time);if(e.ball.x>FIELD.right-3){terminal(e,inGoalMouth(e),inGoalMouth(e)?'AL ARCO':'AFUERA',inGoalMouth(e)?'on-target':'wide');return;}if(elapsed>.42&&speed(e.ball)<.28){terminal(e,false,'CORTO','dead');return;}if(elapsed>2.25)terminal(e,false,'AFUERA','timeout');}
 
-  if(id==='st-box-duel'){
-    if(q.customStage==='turn'&&e.ball.lastPlayerId===e.player.id&&(e.ball.x>775||stageAge(e)>.95)){
-      if(!q.turnComplete){q.turnComplete=true;m.duelsBeaten=(m.duelsBeaten||0)+1;e.flashTraining('GIRO LIMPIO');}
-      q.repTerminal=false;q.repTerminalAt=null;q.repSuccess=false;
-      q.customStage='finish';q.stageAt=e.time;
-      return;
-    }
-    ensureBoxFinishContact(e,dt);
-    if(q.shotTick!=null){
-      forceSuccess(e,'GIRO + REMATE','box-duel-shot-executed');
-      return;
-    }
-  }
-
-  if(id==='st-press'){
-    if(q.forcedPassTick>=0){
-      forceSuccess(e,'PASE ATRÁS FORZADO','forced-back-pass');
-      return;
-    }
-    if(q.customStage==='trap'&&stageAge(e)>1.15&&e.ball.lastPlayerId===e.defenders?.[1]?.id){
-      forceSuccess(e,'SALIDA ENCERRADA','wide-exit-contained');
-      return;
-    }
-  }
-
-  if(id==='st-free-kick'&&q.shotTick!=null){
-    forceSuccess(e,'TIRO LIBRE EJECUTADO','free-kick-physically-executed');
-  }
-}
+function setup(e,rep){const id=e.drill?.id;if(id==='st-profile-finish')setupProfile(e,rep);else if(id==='st-one-touch')setupOneTouch(e,rep);else if(id==='st-run-behind')setupRunBehind(e,rep);else if(id==='st-wall-run')setupWallRun(e,rep);else if(id==='st-box-duel')setupBox(e,rep);else if(id==='st-press')setupPress(e,rep);else if(id==='st-free-kick')setupFreeKick(e,rep);}
+function scenario(e,dt){const id=e.drill?.id;if(id==='st-profile-finish')return profileScenario(e,dt);if(id==='st-one-touch')return oneTouchScenario(e,dt);if(id==='st-run-behind')return runBehindScenario(e,dt);if(id==='st-wall-run')return wallRunScenario(e,dt);if(id==='st-box-duel')return boxScenario(e,dt);if(id==='st-press')return pressScenario(e,dt);if(id==='st-free-kick')return freeKickScenario(e,dt);}
 
 export class TrainingMatchEngine extends TrainingMatchEngineV12{
   constructor(drill,result,player){super(drill,result,player);this.trainingEngineVersion=13;}
-  resetRep(rep,initial=false){return super.resetRep(rep,initial);}
-  scenario(dt){
-    const out=super.scenario(dt);
-    reconcilePhysicalExecution(this,dt);
-    return out;
-  }
-  sessionResult(){const out=super.sessionResult();return{...out,engineVersion:13};}
+  resetRep(rep,initial=false){super.resetRep(rep,initial);if(IDS.has(this.drill?.id))setup(this,rep);}
+  scenario(dt){if(IDS.has(this.drill?.id))return scenario(this,dt);return super.scenario(dt);}
+  resolveBallPlayerCollisions(){const direct=!!this.ball?.trainingDirectPass,before=this.ball?.lastTouchTick??-1,q=this.trainingQualityV6;if(direct){this.ball.intendedReceiverId=null;this.ball.passerId=null;this.ball.lastTeam=null;}const out=super.resolveBallPlayerCollisions();if(direct&&q?.expectedDirectReceiverId&&this.ball.lastPlayerId===q.expectedDirectReceiverId&&(this.ball.lastTouchTick??-1)>before){q.directReceiveTick=this.ball.lastTouchTick;q.directReceiveX=this.ball.x;q.directReceiveY=this.ball.y;this.ball.trainingDirectPass=false;}return out;}
+  sessionResult(){return{...super.sessionResult(),engineVersion:13};}
 }
 
-export const __trainingMatchEngineV13={reconcilePhysicalExecution,forceSuccess,ensureBoxFinishContact};
+export const __trainingMatchEngineV13={IDS,physicalKick,carryBehind};
