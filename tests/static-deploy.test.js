@@ -45,3 +45,13 @@ test('Vercel never serves a stale game shell that requires Ctrl+F5',()=>{
   assert.equal(values['cdn-cache-control'],'no-store');
   assert.equal(values['vercel-cdn-cache-control'],'no-store');
 });
+
+test('production workflow publishes static Build Output API payload without Vercel build inference',()=>{
+  const workflow=fs.readFileSync(path.join(root,'.github','workflows','deploy-vercel-production.yml'),'utf8');
+  assert.match(workflow,/\.vercel\/output\/static/);
+  assert.match(workflow,/version:\s*3/);
+  assert.match(workflow,/test ! -d \.vercel\/output\/functions/);
+  assert.match(workflow,/deploy --prebuilt --prod/);
+  assert.doesNotMatch(workflow,/vercel@latest build/);
+  assert.doesNotMatch(workflow,/vercel@latest pull/);
+});
