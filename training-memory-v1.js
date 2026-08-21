@@ -39,7 +39,9 @@ export function previewTrainingResult(state,drillId,attempt=0){
   return{drillId,quality,grade,reps,successes,ability:Math.round(ability),memoryBefore:Math.round(familiarity),seed:`${state.season}-${state.week}-${drillId}-${attempt}`};
 }
 
-function workThreshold(value){return 78+Math.max(0,Number(value)-45)*1.85;}
+export function developmentWorkThreshold(value){const v=clamp(Number(value)||50,30,99);if(v<50)return 58+(v-30)*.8;if(v<65)return 76+(v-50)*2;if(v<75)return 108+(v-65)*4.2;if(v<85)return 152+(v-75)*7.5;return 232+(v-85)*12.5;}
+export function developmentLearningEfficiency(value){const v=clamp(Number(value)||50,30,99);if(v<50)return 1.55;if(v<60)return 1.32;if(v<70)return 1.12;if(v<75)return .94;if(v<85)return .68;return .45;}
+function workThreshold(value){return developmentWorkThreshold(value);}
 function nextAttributeProgress(player,drill){
   return Object.entries(drill.attrs).map(([attr,weight])=>{
     const threshold=workThreshold(player[attr]),work=Number(player.developmentWork?.[attr]||0),percent=clamp(Math.round(work/threshold*100),0,99);
@@ -54,7 +56,7 @@ export function applyTrainingResult(state,result,calculateOverall=null){
   const p=state.player,oldSessions=p.trainingSummary.sessions||0,oldAvg=p.trainingSummary.avgGrade||0,gradeValue=GRADE_VALUE[result.grade]||1,reps=Math.max(1,Number(result.reps)||1),successRate=clamp((Number(result.successes)||0)/reps,0,1);
   const memoryGain=clamp(Math.round(2+result.quality/14+successRate*3),3,12);
   for(const key of drill.memories){const old=p.trainingMemory[key]||{familiarity:0,reps:0,quality:0,lastWeek:0};const nextFam=clamp(old.familiarity+memoryGain*(1-old.familiarity/135),0,100);p.trainingMemory[key]={familiarity:+nextFam.toFixed(1),reps:(old.reps||0)+reps,quality:+(((old.quality||result.quality)*.7)+result.quality*.3).toFixed(1),lastWeek:state.week};}
-  const gained=[];for(const [attr,weight] of Object.entries(drill.attrs)){const performanceMultiplier=.84+successRate*.34+(result.grade==='S'?.10:result.grade==='A'?.05:0),xp=result.quality*reps*weight*.095*performanceMultiplier;let work=(p.developmentWork[attr]||0)+xp,threshold=workThreshold(p[attr]);while(work>=threshold&&p[attr]<99&&p[attr]<(p.dynamicPotential??p.potential??96)+5){work-=threshold;p[attr]=clamp(p[attr]+1,30,99);gained.push(attr);threshold=workThreshold(p[attr]);}p.developmentWork[attr]=+work.toFixed(1);}
+  const gained=[];for(const [attr,weight] of Object.entries(drill.attrs)){const performanceMultiplier=.84+successRate*.34+(result.grade==='S'?.10:result.grade==='A'?.05:0),learningEfficiency=developmentLearningEfficiency(p[attr]),xp=result.quality*reps*weight*.095*performanceMultiplier*learningEfficiency;let work=(p.developmentWork[attr]||0)+xp,threshold=workThreshold(p[attr]);while(work>=threshold&&p[attr]<99&&p[attr]<(p.dynamicPotential??p.potential??96)+5){work-=threshold;p[attr]=clamp(p[attr]+1,30,99);gained.push(attr);threshold=workThreshold(p[attr]);}p.developmentWork[attr]=+work.toFixed(1);}
   p.trainingSummary={sessions:oldSessions+1,avgGrade:+((oldAvg*oldSessions+gradeValue)/(oldSessions+1)).toFixed(2),bestGrade:!p.trainingSummary.bestGrade||p.trainingSummary.bestGrade==='—'||gradeValue>(GRADE_VALUE[p.trainingSummary.bestGrade]||0)?result.grade:p.trainingSummary.bestGrade};
   p.trainingLog.unshift({season:state.season,week:state.week,drillId:drill.id,grade:result.grade,quality:result.quality,reps,successes:result.successes,memoryGain,development:nextAttributeProgress(p,drill).slice(0,3)});p.trainingLog=p.trainingLog.slice(0,30);
   state.progress.trainingPoints--;state.progress.xp=(state.progress.xp||0)+Math.round(12+result.quality*.28);state.campaign.coachTrust=clamp((state.campaign.coachTrust||50)+(result.grade==='S'?3:result.grade==='A'?2:result.grade==='B'?1:result.grade==='E'?-1:0),0,100);p.fitness=clamp((p.fitness??100)-(5+reps*.35),35,100);
