@@ -1,11 +1,50 @@
-MIT License
+CAREER ELEVEN PROPRIETARY LICENSE
+ALL RIGHTS RESERVED
 
-Copyright (c) 2026 Stefano Belletti
+Copyright (c) 2026 Stefano Belletti. All rights reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+This repository, its original source code, documentation, game-design materials, written content, original data structures, audiovisual assets, user-interface materials, and other original project materials (collectively, the "Project Materials") are proprietary.
 
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+1. NO LICENSE GRANT
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+Except for rights that the copyright holder grants in a separate written agreement, no license or permission is granted to any person or entity to use the Project Materials.
 
-Bundled third-party data remains subject to the licenses documented in SOURCES.md.
+Access to this repository, possession of a copy, access to a deployed build, or visibility of any Project Materials does not grant any right to use, reproduce, modify, adapt, merge, publish, distribute, sublicense, sell, commercialize, host, mirror, fork, republish, or create derivative works from the Project Materials.
+
+2. COPYING AND REDISTRIBUTION PROHIBITED
+
+You may not copy, reproduce, redistribute, mirror, fork, republish, re-host, sell, sublicense, or otherwise provide the Project Materials, in whole or in substantial part, to another person, service, repository, model, agent, or system without prior written authorization from the copyright holder.
+
+You may not use the Project Materials to create or assist in creating an unauthorized clone, remake, replacement, competing copy, or substantially reproduced version of Career Eleven.
+
+3. AUTOMATED SYSTEMS AND AI AGENTS
+
+No permission is granted for an AI agent, coding agent, automated system, crawler, model, or assistant to extract, reproduce, redistribute, mirror, or assist a third party in duplicating the Project Materials.
+
+An automated system acting directly for the copyright holder may make temporary technical copies that are strictly necessary to perform explicitly authorized development, testing, deployment, backup, or maintenance work. Those temporary copies do not grant any independent right to retain, redistribute, repurpose, or disclose the Project Materials.
+
+4. PROJECT-SPECIFIC DESIGN MATERIALS
+
+No permission is granted to copy or reproduce project-specific design documents, roadmaps, playbooks, written mechanics, narrative material, UI copy, diagrams, specifications, or other original expressive materials from this repository.
+
+Nothing in this license claims exclusive ownership of abstract ideas, general game mechanics, facts, or other subject matter that applicable law does not protect. It does prohibit unauthorized copying of the Project's protected expression and implementation.
+
+5. PUBLIC BUILDS
+
+Permission to access or play an officially deployed Career Eleven build is limited to normal use of that build as provided by the project owner. It does not grant permission to obtain, reproduce, redistribute, reverse engineer, republish, or commercially exploit the source code or Project Materials, except where a restriction is prohibited by applicable law.
+
+6. THIRD-PARTY MATERIALS
+
+This license applies only to Project Materials for which the Career Eleven copyright holder owns or controls the relevant rights. Third-party software, data, names, trademarks, factual information, or other third-party materials remain subject to their respective licenses, terms, and applicable law. See SOURCES.md where applicable.
+
+Nothing in this license removes or restricts rights that a third-party license independently grants to third-party material.
+
+7. WRITTEN PERMISSION
+
+Any permission to copy, use, modify, distribute, publish, host, mirror, sublicense, commercialize, or create derivative works from the proprietary Project Materials must be granted expressly in writing by the copyright holder. Silence, repository access, a public deployment, or failure to restrict technical access does not constitute permission.
+
+8. WARRANTY DISCLAIMER
+
+THE PROJECT MATERIALS ARE PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, TO THE MAXIMUM EXTENT PERMITTED BY LAW. THE COPYRIGHT HOLDER IS NOT LIABLE FOR DAMAGES ARISING FROM UNAUTHORIZED OR AUTHORIZED USE OF THE PROJECT MATERIALS EXCEPT WHERE LIABILITY CANNOT LAWFULLY BE EXCLUDED.
+
+ALL RIGHTS RESERVED.
