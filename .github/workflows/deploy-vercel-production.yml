@@ -69,11 +69,33 @@ jobs:
           {"orgId":"$VERCEL_ORG_ID","projectId":"$VERCEL_PROJECT_ID","projectName":"futbol-carrera-2d"}
           JSON
 
-      - name: Pull production environment
-        run: npx --yes vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
+      - name: Prepare static Build Output API payload
+        shell: bash
+        run: |
+          rm -rf .vercel/output
+          mkdir -p .vercel/output/static
+          cp dist/index.html .vercel/output/static/index.html
+          node <<'NODE'
+          const fs = require('node:fs');
+          const headers = {
+            'Cache-Control': 'no-store, max-age=0, must-revalidate',
+            'CDN-Cache-Control': 'no-store',
+            'Vercel-CDN-Cache-Control': 'no-store',
+            'X-Content-Type-Options': 'nosniff',
+            'Referrer-Policy': 'strict-origin-when-cross-origin',
+            'Permissions-Policy': 'camera=(), microphone=(), geolocation=()'
+          };
+          const config = {
+            version: 3,
+            routes: [
+              {src: '^/(.*)$', headers, dest: '/index.html'}
+            ]
+          };
+          fs.writeFileSync('.vercel/output/config.json', JSON.stringify(config));
+          NODE
+          test -s .vercel/output/static/index.html
+          test -s .vercel/output/config.json
+          test ! -d .vercel/output/functions
 
-      - name: Build Vercel static output
-        run: npx --yes vercel@latest build --prod --token="$VERCEL_TOKEN"
-
-      - name: Deploy to production
+      - name: Deploy static output to production
         run: npx --yes vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN"
