@@ -24,8 +24,12 @@ if(!new RegExp(`matchEngine\\s*:\\s*TRAINING_MATCH_ENGINE_VERSION`).test(runtime
 if(!new RegExp(`authoritativeScenarios\\s*:\\s*${engineVersion}\\b`).test(runtime))fail(`runtime must expose authoritative scenarios v${engineVersion}`);
 if(/training-(?:intelligence|small-sided|transfer|competitive|role-scenarios)-v\d+\.js/.test(runtime))fail('production runtime must not load legacy scenario patch layers');
 if(/training-engine-v\d+\.js/.test(runtime))fail('canonical runtime must never load the standalone legacy TrainingEngine');
-if(!/extends\s+LegacyTrainingMatchEngine/.test(engineSource))fail('v2 engine must isolate behavior in its own subclass');
-if(!/resetRep\s*\(/.test(engineSource)||!/scenario\s*\(/.test(engineSource))fail('v2 engine must own resetRep and scenario execution');
+if(!/extends\s+(?:LegacyTrainingMatchEngine|TrainingMatchEngineV\d+)/.test(engineSource))fail(`training engine v${engineVersion} must extend the isolated training engine chain`);
+if(!/resetRep\s*\(/.test(engineSource)||!/scenario\s*\(/.test(engineSource))fail(`training engine v${engineVersion} must own resetRep and scenario execution`);
+
+const v2Source=await readFile(path.join(root,'training-match-engine-v2.js'),'utf8');
+if(!/extends\s+LegacyTrainingMatchEngine/.test(v2Source))fail('training engine v2 must establish the isolated subclass boundary from legacy');
+if(!/resetRep\s*\(/.test(v2Source)||!/scenario\s*\(/.test(v2Source))fail('training engine v2 must own the base authoritative reset/scenario execution');
 
 if(!new RegExp(`liveUi\\s*:\\s*${liveUiVersion}\\b`).test(runtime))fail(`runtime manifest liveUi must report v${liveUiVersion}`);
 if(!exactImport(index,'training-runtime-latest.js'))fail('index.html must load the canonical training runtime');
