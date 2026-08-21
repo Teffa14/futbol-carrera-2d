@@ -1,0 +1,24 @@
+name: Diagnose Vercel credential
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  credential:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Vercel token presence
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        shell: bash
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "VERCEL_TOKEN_MISSING"
+            exit 1
+          fi
+          echo "VERCEL_TOKEN_PRESENT"
