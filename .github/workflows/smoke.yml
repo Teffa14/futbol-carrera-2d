@@ -20,8 +20,8 @@ jobs:
       - name: Run tests
         run: |
           if ! npm test > /tmp/career-eleven-tests.log 2>&1; then
-            echo "Test suite failed. Showing final 160 lines:"
-            tail -n 160 /tmp/career-eleven-tests.log
+            echo "Test suite failed. Showing failing TAP blocks:"
+            grep -n -B 3 -A 45 '^not ok ' /tmp/career-eleven-tests.log || tail -n 160 /tmp/career-eleven-tests.log
             exit 1
           fi
       - uses: actions/upload-artifact@v4
