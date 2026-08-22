@@ -2,13 +2,19 @@ name: Test Career Eleven
 on:
   push:
     branches: [main]
-  # Keep PR validation enabled so deployment-infrastructure changes can be verified before merge.
   pull_request:
+
 permissions:
   contents: write
+
+concurrency:
+  group: career-eleven-main-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,11 +30,108 @@ jobs:
             grep -n -B 3 -A 45 '^not ok ' /tmp/career-eleven-tests.log || tail -n 160 /tmp/career-eleven-tests.log
             exit 1
           fi
+
+      - name: Validate production artifact
+        shell: bash
+        run: |
+          test -s dist/index.html
+          BYTES="$(wc -c < dist/index.html)"
+          if [ "$BYTES" -lt 100000 ] || [ "$BYTES" -ge 26214400 ]; then
+            echo "Refusing suspicious production artifact: ${BYTES} bytes." >&2
+            exit 1
+          fi
+          grep -q 'id="app"' dist/index.html
+          grep -q 'Career Eleven' dist/index.html
+          if grep -Eqi 'raw\.githubusercontent\.com/Teffa14|github\.com/Teffa14|api\.github\.com/repos/Teffa14|Teffa14/futbol-carrera-2d' dist/index.html; then
+            echo "Production artifact leaks the source repository." >&2
+            exit 1
+          fi
+          echo "Validated ${BYTES}-byte standalone artifact."
+
       - uses: actions/upload-artifact@v4
         with:
           name: production-static
           path: dist/index.html
           if-no-files-found: error
+
+      - name: Prepare exact Vercel Build Output
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: bash
+        env:
+          VERCEL_ORG_ID: team_Ch0YhVIbdeOyZrb6zKrdYYWC
+          VERCEL_PROJECT_ID: prj_IBNlWUiiTAcv30ZZ8lfhaV22Ejd9
+        run: |
+          rm -rf .vercel
+          mkdir -p .vercel/output/static
+          cp dist/index.html .vercel/output/static/index.html
+          cat > .vercel/project.json <<JSON
+          {"orgId":"$VERCEL_ORG_ID","projectId":"$VERCEL_PROJECT_ID","projectName":"futbol-carrera-2d"}
+          JSON
+          node <<'NODE'
+          const fs = require('node:fs');
+          const headers = {
+            'Cache-Control': 'no-store, max-age=0, must-revalidate',
+            'CDN-Cache-Control': 'no-store',
+            'Vercel-CDN-Cache-Control': 'no-store',
+            'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'DENY',
+            'Referrer-Policy': 'strict-origin-when-cross-origin'
+          };
+          fs.writeFileSync('.vercel/output/config.json', JSON.stringify({
+            version: 3,
+            routes: [{ src: '^/(.*)$', headers, dest: '/index.html' }]
+          }));
+          NODE
+          test -s .vercel/output/static/index.html
+          test -s .vercel/output/config.json
+          test "$(wc -c < .vercel/output/static/index.html)" -eq "$(wc -c < dist/index.html)"
+
+      - name: Deploy and verify production byte-for-byte
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          PRODUCTION_URL: https://futbol-carrera-2d.vercel.app
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "VERCEL_TOKEN is not configured." >&2
+            exit 1
+          fi
+
+          EXPECTED_SHA="$(sha256sum dist/index.html | awk '{print $1}')"
+          DEPLOYMENT_URL="$(npx --yes vercel@50.31.1 deploy --prebuilt --prod --yes --token="$VERCEL_TOKEN" 2>&1 | tee /tmp/vercel-deploy.log | grep -Eo 'https://[^[:space:]]+\.vercel\.app' | tail -n 1)"
+          if [ -z "$DEPLOYMENT_URL" ]; then
+            cat /tmp/vercel-deploy.log >&2
+            echo "Vercel did not return a deployment URL." >&2
+            exit 1
+          fi
+          echo "Created $DEPLOYMENT_URL"
+
+          verify_url() {
+            local base="$1"
+            local output="$2"
+            local actual_sha=""
+            local url="${base}/?build=${GITHUB_SHA}"
+            for attempt in $(seq 1 20); do
+              if curl --fail --silent --show-error --location --max-time 25 --header 'Accept-Encoding: identity' "$url" -o "$output"; then
+                actual_sha="$(sha256sum "$output" | awk '{print $1}')"
+                if [ "$actual_sha" = "$EXPECTED_SHA" ]; then
+                  echo "Verified $base at SHA-256 $actual_sha"
+                  return 0
+                fi
+              fi
+              echo "Waiting for $base (attempt $attempt/20)..."
+              sleep 3
+            done
+            echo "Production verification failed for $base" >&2
+            echo "Expected SHA-256: $EXPECTED_SHA" >&2
+            echo "Received SHA-256: ${actual_sha:-unavailable}" >&2
+            return 1
+          }
+
+          verify_url "$DEPLOYMENT_URL" /tmp/direct-production.html
+          verify_url "$PRODUCTION_URL" /tmp/aliased-production.html
+
       - name: Publish verified production artifact
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
