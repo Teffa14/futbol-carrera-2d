@@ -84,6 +84,22 @@ export function perceivedOpponents(engine,p,options={}){
   return perceivedPlayers(engine,p,options).filter(s=>s.team!==p.team);
 }
 
+export function perceivedOpponentStates(engine,p,options={}){
+  return perceivedOpponents(engine,p,options).map(observation=>{
+    const live=observation.player;
+    return{
+      ...live,
+      x:observation.x,
+      y:observation.y,
+      vx:observation.vx,
+      vy:observation.vy,
+      perceptionConfidence:observation.confidence,
+      perceptionVisible:observation.visible,
+      perceptionLastSeenTick:observation.lastSeenTick,
+    };
+  });
+}
+
 export function perceptionConfidence(engine,p,targetId){
   const item=perceivedPlayers(engine,p).find(s=>s.id===targetId);
   return item?.confidence??0;
