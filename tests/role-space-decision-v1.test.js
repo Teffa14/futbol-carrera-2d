@@ -27,11 +27,11 @@ test('wide roles prefer lane occupation more than central midfielders',()=>{
   assert.ok(bias('LB',wide)>bias('CDM',wide));
 });
 
-test('defensive profiles penalize aggressive forward space while defending',()=>{
-  const forward={x:690,y:350};
-  const cb=roleSpaceCandidateBias({role:'CB',attackDirection:1,anchor,target:forward,field,defending:true});
-  const cam=roleSpaceCandidateBias({role:'CAM',attackDirection:1,anchor,target:forward,field,defending:true});
-  assert.ok(cb<cam);
+test('centre-back defensive policy prefers security over stepping forward',()=>{
+  const forward={x:690,y:350},secure={x:470,y:350};
+  const forwardScore=roleSpaceCandidateBias({role:'CB',attackDirection:1,anchor,target:forward,field,defending:true});
+  const secureScore=roleSpaceCandidateBias({role:'CB',attackDirection:1,anchor,target:secure,field,defending:true});
+  assert.ok(secureScore>forwardScore);
 });
 
 test('spatial policy stays independent from ball ownership or steering fields',()=>{
