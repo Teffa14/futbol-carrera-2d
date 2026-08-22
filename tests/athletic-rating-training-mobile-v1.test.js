@@ -4,7 +4,7 @@ import fs from 'node:fs';
 
 const {TRAINING_SPEED,stepTrainingX4,rebuildTrainingResult,trainingPhase}=await import('../training-session-v6.js');
 const {MatchEngine}=await import('../engine.js');
-await import('../match-evaluation-v2.js');
+const {__evaluationV2}=await import('../match-evaluation-v2.js');
 await import('../stamina-load-v1.js');
 const {__playerPerformanceScoreV1}=await import('../player-performance-score-v1.js');
 
@@ -49,8 +49,7 @@ test('balanced scoring rewards causal role work and exposes ratings for every pl
   const e=makeEngine(80,'CB'),p=e.playerById('user-player');
   for(let i=0;i<6;i++)__playerPerformanceScoreV1.evaluateRoleWork(e);
   const before=__playerPerformanceScoreV1.balancedPlayerRating(e,p).rating;
-  const evalApi=(await import('../match-evaluation-v2.js')).__evaluationV2;
-  evalApi.add(e,p,'defending',.9,'Cierra una jugada');
+  __evaluationV2.add(e,p,'defending',.9,'Cierra una jugada');
   p.perf.passesAttempted=12;p.perf.passesCompleted=11;p.perf.bodyDuels=6;p.perf.bodyDuelsWon=5;p.perf.touches=30;
   const after=__playerPerformanceScoreV1.balancedPlayerRating(e,p).rating,report=e.report();
   assert.ok(after>before);
