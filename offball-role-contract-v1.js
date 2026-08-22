@@ -31,6 +31,7 @@ export function applyOffBallRoleContract({target,player,ball,tacticalState,tacti
 
   const next={...target};
   const dir=attackDir(player.team);
+  const id=instruction.id||'';
   const action=instruction.action||'';
   const discipline=clamp((instruction.roleDiscipline??70)/100,.48,.94);
   const strength=.42+.34*discipline;
@@ -38,13 +39,14 @@ export function applyOffBallRoleContract({target,player,ball,tacticalState,tacti
   const anchorY=player.homeY??player.y??target.y;
 
   if(/width|outside/.test(action)){
-    next.y=lerp(next.y,wideLaneY(player,field),strength);
+    const widthStrength=id==='coach-max-width'?Math.min(.92,strength+.18):strength*.64;
+    next.y=lerp(next.y,wideLaneY(player,field),widthStrength);
   }
   if(/pin-centre-backs|preserve-depth|threaten-depth|attack-centre-back-blindside|finishing-lane/.test(action)){
     const depth=Math.max(anchorX+dir*72,ball.x+dir*58);
     next.x=lerp(next.x,depth,strength);
   }
-  if(/stay-behind-ball|rest-defence|secure-recycle|protect-central/.test(action)){
+  if(id==='cb-rest-defence'||/stay-behind-ball|rest-defence|secure-recycle|protect-central|opposition-outlet|second-ball/.test(action)){
     const safeX=dir===1?Math.min(anchorX+26,ball.x-58):Math.max(anchorX-26,ball.x+58);
     next.x=lerp(next.x,safeX,strength);
     next.y=lerp(next.y,(field.top+field.bottom)/2,.18*strength);
