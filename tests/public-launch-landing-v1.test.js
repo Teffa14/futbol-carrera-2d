@@ -17,13 +17,13 @@ test('public entry mounts the launch landing without replacing the playable app'
   assert.match(landing,/searchParams\.get\('play'\)/);
 });
 
-test('landing clearly separates current beta from future roadmap ambitions',()=>{
-  for(const text of ['BETA PÚBLICA','ROADMAP','Diseño de jugadas','Playbooks','Ligas PvP humanas','Veintidós personas','Servidor autoritativo','YOUTUBERS Y STREAMERS']){
+test('landing clearly separates the active beta from next and future football work',()=>{
+  for(const text of ['BETA PÚBLICA','02 · LO QUE FALTA','Carrera individual','Más decisiones de cancha','Preparar jugadas','Un jugador por persona','Ligas organizadas','Seguir una carrera fecha a fecha']){
     assert.ok(landing.includes(text),`falta ${text}`);
   }
-  assert.match(landing,/JUGABLE \+ EN EXPANSIÓN/);
-  assert.match(landing,/VISIÓN COMPETITIVA/);
-  assert.match(landing,/VISIÓN A LARGO PLAZO/);
+  assert.match(landing,/BETA ACTIVA/);
+  assert.match(landing,/EN DESARROLLO/);
+  assert.match(landing,/A FUTURO/);
 });
 
 test('funding panel exposes only the approved alias and CVU',()=>{
@@ -34,7 +34,7 @@ test('funding panel exposes only the approved alias and CVU',()=>{
 
 test('creator section keeps the requested project voice',()=>{
   assert.match(landing,/No sean ratas coludas\./);
-  assert.match(landing,/bancá el proyecto también/);
+  assert.match(landing,/podés bancar el desarrollo también/);
 });
 
 test('landing has dedicated responsive presentation rather than inheriting dashboard cards',()=>{

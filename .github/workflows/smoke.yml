@@ -2,6 +2,7 @@ name: Test Career Eleven
 on:
   push:
     branches: [main]
+  # Keep PR validation enabled so deployment-infrastructure changes can be verified before merge.
   pull_request:
 permissions:
   contents: write
@@ -16,7 +17,13 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npm run check
       - run: npm run build
-      - run: npm test
+      - name: Run tests
+        run: |
+          if ! npm test > /tmp/career-eleven-tests.log 2>&1; then
+            echo "Test suite failed. Showing failing TAP blocks:"
+            grep -n -B 3 -A 45 '^not ok ' /tmp/career-eleven-tests.log || tail -n 160 /tmp/career-eleven-tests.log
+            exit 1
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: production-static

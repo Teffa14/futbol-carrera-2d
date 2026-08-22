@@ -36,5 +36,5 @@ test('prematch helpers create a football briefing instead of card list',()=>{
 
 test('production wiring removes live training v4 and keeps markers/commentary beside pitch',async()=>{
   const [index,live,home,pre]=await Promise.all([readFile(new URL('../index.html',import.meta.url),'utf8'),readFile(new URL('../training-live-ui-v5.js',import.meta.url),'utf8'),readFile(new URL('../training-ui-v2.js',import.meta.url),'utf8'),readFile(new URL('../prematch-ui-v2.js',import.meta.url),'utf8')]);
-  assert.match(index,/training-live-ui-v5\.js/);assert.doesNotMatch(index,/import '\.\/training-live-ui-v4\.js'/);assert.match(live,/tr5-markers/);assert.match(live,/trainingV5Log/);assert.match(live,/grid-template-columns:minmax\(0,1fr\) 350px/);assert.match(home,/CENTRO DE ENTRENAMIENTO/);assert.match(home,/RECOMENDADO/);assert.match(pre,/PLAN DEL PARTIDO/);assert.match(pre,/SOCIEDADES/);assert.match(pre,/AMENAZAS DEL RIVAL/);
+  assert.match(index,/training-live-ui-v5\.js/);assert.doesNotMatch(index,/import '\.\/training-live-ui-v4\.js'/);assert.match(live,/tr5-markers/);assert.match(live,/trainingV5Log/);assert.match(live,/grid-template-columns:minmax\(0,1fr\) 350px/);assert.match(home,/Semana de trabajo/);assert.match(home,/RECOMENDADO/);assert.match(pre,/PLAN DEL PARTIDO/);assert.match(pre,/SOCIEDADES/);assert.match(pre,/AMENAZAS DEL RIVAL/);
 });
