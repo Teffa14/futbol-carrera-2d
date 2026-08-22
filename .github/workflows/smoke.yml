@@ -2,6 +2,7 @@ name: Test Career Eleven
 on:
   push:
     branches: [main]
+  # Keep PR validation enabled so deployment-infrastructure changes can be verified before merge.
   pull_request:
 permissions:
   contents: write
