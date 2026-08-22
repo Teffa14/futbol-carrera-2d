@@ -3,6 +3,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -55,7 +56,7 @@ jobs:
           if-no-files-found: error
 
       - name: Prepare exact Vercel Build Output
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
         shell: bash
         env:
           VERCEL_ORG_ID: team_Ch0YhVIbdeOyZrb6zKrdYYWC
@@ -87,7 +88,7 @@ jobs:
           test "$(wc -c < .vercel/output/static/index.html)" -eq "$(wc -c < dist/index.html)"
 
       - name: Deploy and verify production byte-for-byte
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
         shell: bash
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -133,7 +134,7 @@ jobs:
           verify_url "$PRODUCTION_URL" /tmp/aliased-production.html
 
       - name: Publish verified production artifact
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
         env:
           BUILD_SHA: ${{ github.sha }}
         run: |
