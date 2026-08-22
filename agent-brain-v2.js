@@ -41,7 +41,7 @@ function spacingCandidate(engine,p,base,possession){
     const nearestMate=Math.min(...mates.map(m=>Math.hypot(m.x-x,m.y-y)),180),nearestOpp=Math.min(...opps.map(m=>Math.hypot(m.x-x,m.y-y)),180),baseCost=Math.hypot(x-base.x,y-base.y);
     let score=nearestMate*.035+nearestOpp*.008-baseCost*.021+(noise(key,`candidate-${i}`)-.5)*.26;
     score+=roleSpaceCandidateBias({role:p.role,attackDirection:dir,anchor:{x:p.homeX??p.x,y:p.homeY??p.y},target:{x,y},field:FIELD,hasPossession:our,defending:enemy})*2.4;
-    score+=dynamicSpaceAdvantage(p,opps,{x,y})*(our?1.25:enemy?.9:1.05);
+    score+=dynamicSpaceAdvantage(p,opps,{x,y})*(our?.45:enemy?.35:.55);
     if(our)score+=dir*(x-base.x)*.011;if(enemy&&roleFamily(p.role)==='DEF')score-=dir*(x-base.x)*.008;
     if(score>best.score)best={x,y,score};
   }
