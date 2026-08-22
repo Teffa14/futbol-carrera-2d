@@ -1,4 +1,5 @@
 import {MatchEngine} from './engine.js';
+import './law12-fouls-v1.js';
 
 export const FIELD={left:55,right:1045,top:45,bottom:655,goalTop:295,goalBottom:405,centerX:550,centerY:350};
 export const PLAYER_RADIUS=6.7;
