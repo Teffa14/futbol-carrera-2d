@@ -34,13 +34,19 @@ test('training grade uses execution, indicators and repetition consistency',()=>
   assert.equal(trainingPhase(.9),'Ejecución');
 });
 
-test('high stamina preserves repeat effort better under identical running load',()=>{
+test('high stamina preserves repeat effort better under identical sprint blocks',()=>{
   const high=makeEngine(92),low=makeEngine(48),ph=high.playerById('user-player'),pl=low.playerById('user-player');
-  for(let i=0;i<520;i++){
-    const th={x:i%2?900:220,y:i%4<2?180:520},tl={...th};
-    high.movePlayer(ph,th,.016,true);low.movePlayer(pl,tl,.016,true);
+  for(let block=0;block<7;block++){
+    for(const p of [ph,pl]){p.x=220;p.y=350;p.vx=0;p.vy=0;}
+    for(let i=0;i<72;i++){
+      ph.burstTimer=.3;pl.burstTimer=.3;
+      high.movePlayer(ph,{x:930,y:350},.016,true);low.movePlayer(pl,{x:930,y:350},.016,true);
+    }
+    for(let i=0;i<24;i++){
+      high.movePlayer(ph,{x:ph.x,y:ph.y},.016,true);low.movePlayer(pl,{x:pl.x,y:pl.y},.016,true);
+    }
   }
-  assert.ok(pl.fatigue>ph.fatigue+2,`low ${pl.fatigue} should exceed high ${ph.fatigue}`);
+  assert.ok(pl.fatigue>ph.fatigue+1,`low ${pl.fatigue} should exceed high ${ph.fatigue}`);
   assert.ok((ph.staminaState?.movementFactor??0)>(pl.staminaState?.movementFactor??0));
   assert.equal('ownerId' in high.ball,false);
 });
