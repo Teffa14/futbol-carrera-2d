@@ -46,12 +46,21 @@ test('Vercel never serves a stale game shell that requires Ctrl+F5',()=>{
   assert.equal(values['vercel-cdn-cache-control'],'no-store');
 });
 
-test('production workflow publishes static Build Output API payload without Vercel build inference',()=>{
-  const workflow=fs.readFileSync(path.join(root,'.github','workflows','deploy-vercel-production.yml'),'utf8');
+test('main validation workflow publishes static Build Output API payload without Vercel build inference',()=>{
+  const workflow=fs.readFileSync(path.join(root,'.github','workflows','smoke.yml'),'utf8');
   assert.match(workflow,/\.vercel\/output\/static/);
   assert.match(workflow,/version:\s*3/);
-  assert.match(workflow,/test ! -d \.vercel\/output\/functions/);
   assert.match(workflow,/deploy --prebuilt --prod/);
+  assert.match(workflow,/github\.event_name == 'push'/);
+  assert.match(workflow,/github\.ref == 'refs\/heads\/main'/);
   assert.doesNotMatch(workflow,/vercel@latest build/);
   assert.doesNotMatch(workflow,/vercel@latest pull/);
+});
+
+test('legacy production workflow remains disabled so only validated main can publish',()=>{
+  const legacy=fs.readFileSync(path.join(root,'.github','workflows','deploy-vercel-production.yml'),'utf8');
+  assert.match(legacy,/Legacy Vercel deploy disabled/);
+  assert.match(legacy,/workflow_dispatch/);
+  assert.doesNotMatch(legacy,/push:\s*\n\s*branches:\s*\[main\]/);
+  assert.doesNotMatch(legacy,/deploy --prebuilt --prod/);
 });
