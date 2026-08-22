@@ -4,6 +4,10 @@ const EXACT_COPY=new Map([
   ['MODO CARRERA · FÚTBOL ARGENTINO','NUEVA CARRERA'],
   ['Tu jugador.','ELEGÍ TU PUESTO.'],
   ['Tu carrera.','DESPUÉS GANÁTELO.'],
+  ['Build','Estilo'],
+  ['Build inicial','Estilo inicial'],
+  ['PvP Async','Desafíos'],
+  ['Fuentes','Créditos'],
   ['Autoplay 2D con 22 jugadores. Conducción por toques, movimiento por espacios y atributos que cambian lo que pasa en cancha.','Elegí posición y perfil. Después vas a tener que demostrarlo en la prueba de ingreso.'],
   ['Definí el perfil inicial. Cada inversión mueve varias capacidades relacionadas y los rangos altos cuestan más.','Repartí tus puntos entre las áreas que mejor representan tu forma de jugar. Los rangos altos cuestan más.'],
   ['La identidad y el talento inicial quedan definidos antes del club. Cambiar de institución no cambia las capacidades del mismo juvenil.','Este perfil te acompaña cuando cambies de club.'],
@@ -28,6 +32,8 @@ const EXACT_COPY=new Map([
   ['Ahora te miran en contexto real.','Ahora vienen los partidos.'],
   ['11 contra 11 autoplay. Los visores pesan más lo que hacés acá que los ejercicios aislados: decisiones, pérdidas, pases, duelos, goles, robos y puntaje.','Los visores te evalúan dentro de un equipo: decisiones, pérdidas, pases, duelos, goles, recuperaciones y rendimiento general.'],
   ['Los visores están mirando. Este partido pesa 60% dentro de la evidencia combinada.','Los visores miran cada intervención y también lo que hacés sin pelota.'],
+  ['El partido suma evidencia para tus ofertas.','Este partido cuenta para las ofertas que vas a recibir.'],
+  ['Todavía no hubo mejora permanente de atributos.','Todavía no mejoraste atributos durante la prueba.'],
   ['ENTRENAMIENTO SIMULADO','ENTRENAMIENTO'],
   ['Entrená acciones, no botones','Trabajo de cancha'],
   ['Cada sesión se ve en cancha. La nota depende de tus atributos, estado físico y familiaridad previa. Practicar crea memoria futbolística. Los atributos sólo suben cuando acumulás suficiente trabajo de desarrollo.','Elegí una situación de tu puesto y repetila. La nota refleja cómo la resolvés y el trabajo se acumula durante la temporada.'],
@@ -40,6 +46,7 @@ const EXACT_COPY=new Map([
   ['Decisión semanal resuelta','Esta semana'],
   ['CALIDAD','EJECUCIÓN'],
   ['ÉXITOS','BUENAS'],
+  ['Los planteles completos usan datos abiertos cuando existen. Los ratings generados se identifican como valores de juego.','Datos y licencias usados para planteles y referencias.'],
 ]);
 
 const COPY_RULES=[
@@ -49,6 +56,11 @@ const COPY_RULES=[
   [/^Familiaridad\s+(\d+)\s+·\s+(\d+)\s+reps$/i,'Práctica $1 · $2 repeticiones'],
   [/^Entrenamiento\s+([EDCBAS—])\s+·\s+[a-z0-9-]+$/i,'Entrenamiento · Nota $1'],
   [/^([A-Z]{2,4})\s+·\s+Estado físico\s+(\d+)\s+·\s+Confianza DT\s+(\d+)\. El partido arranca siempre en x1\.$/i,'$1 · Estado físico $2 · Confianza DT $3.'],
+  [/^Ganaste\s+(\d+)\s+punto\(s\) de atributo durante la prueba\. Máximo total de esta etapa: 4\.$/i,'Mejoraste $1 punto(s) de atributo durante la prueba.'],
+  [/^Visor\s+(\d+)\/100\s+·\s+confianza\s+\d+%\s+·\s+técnico\s+(\d+)\s+·\s+táctico\s+(\d+)\.$/i,'Visor $1/100 · Técnica $2 · Táctica $3.'],
+  [/^Los partidos pesan más que los ejercicios\. Tu OVR final de juvenil es\s+(\d+)\. Elegí dónde empezás a jugar profesionalmente en la B\.$/i,'Tu OVR juvenil es $1. Elegí dónde empezás a jugar profesionalmente en la B.'],
+  [/^Build\s+(.+)$/i,'Estilo $1'],
+  [/^Build base:\s*(.+)$/i,'Estilo base: $1'],
 ];
 
 function replacementFor(raw){
