@@ -4,7 +4,6 @@ import {motionProfile} from './locomotion-v2.js';
 import {classifyWideBehavior,defensiveResponseTarget,observeOpponentBehavior} from './opponent-adaptation-v1.js';
 import {roleSpaceCandidateBias} from './role-space-decision-v1.js';
 import {estimateArrivalTime} from './dynamic-space-control-v1.js';
-import {perceivedOpponentStates} from './perception-scanning-v1.js';
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
@@ -20,17 +19,16 @@ export function positionalIdentity(p){const key=playerKey(p);return{width:noise(
 function dynamicSpaceAdvantage(player,opponents,target){
   const ownTime=estimateArrivalTime(player,target);
   if(!Number.isFinite(ownTime))return 0;
-  if(!(opponents||[]).length)return 0;
   let opponentTime=Infinity;
   for(const opponent of opponents||[]){const time=estimateArrivalTime(opponent,target);if(time<opponentTime)opponentTime=time;}
-  if(!Number.isFinite(opponentTime))return 0;
+  if(!Number.isFinite(opponentTime))return .8;
   return clamp(opponentTime-ownTime,-1.5,1.5);
 }
 
 function spacingCandidate(engine,p,base,possession){
   const key=playerKey(p),id=positionalIdentity(p),dir=p.team===0?1:-1,our=possession===p.team,enemy=possession!==null&&possession!==p.team;
   const offsets=[{x:0,y:0},{x:22,y:0},{x:-22,y:0},{x:0,y:28},{x:0,y:-28},{x:30,y:24},{x:30,y:-24},{x:-30,y:24},{x:-30,y:-24},{x:46,y:0},{x:0,y:46},{x:0,y:-46}];
-  const mates=engine.players.filter(q=>q.team===p.team&&q.id!==p.id),opps=perceivedOpponentStates(engine,p),wide=['LW','RW','LB','RB'].includes(p.role),limit=onsideLimit(engine,p.team);
+  const mates=engine.players.filter(q=>q.team===p.team&&q.id!==p.id),opps=engine.players.filter(q=>q.team!==p.team),wide=['LW','RW','LB','RB'].includes(p.role),limit=onsideLimit(engine,p.team);
   let best={x:base.x,y:base.y,score:-Infinity};
   for(let i=0;i<offsets.length;i++){
     const o=offsets[i],depthScale=roleFamily(p.role)==='FWD'?1:roleFamily(p.role)==='MID'?.72:.45;
@@ -40,7 +38,7 @@ function spacingCandidate(engine,p,base,possession){
     if(our&&p.role==='ST')x+=dir*(8+id.aggression*15);
     if(enemy&&['CB','LB','RB','CDM'].includes(p.role))x-=dir*(5+id.aggression*8);
     x=clamp(x,FIELD.left+p.r,FIELD.right-p.r);y=clamp(y,FIELD.top+p.r,FIELD.bottom-p.r);
-    const nearestMate=Math.min(...mates.map(m=>Math.hypot(m.x-x,m.y-y)),180),nearestOpp=opps.length?Math.min(...opps.map(m=>Math.hypot(m.x-x,m.y-y)),180):90,baseCost=Math.hypot(x-base.x,y-base.y);
+    const nearestMate=Math.min(...mates.map(m=>Math.hypot(m.x-x,m.y-y)),180),nearestOpp=Math.min(...opps.map(m=>Math.hypot(m.x-x,m.y-y)),180),baseCost=Math.hypot(x-base.x,y-base.y);
     let score=nearestMate*.035+nearestOpp*.008-baseCost*.021+(noise(key,`candidate-${i}`)-.5)*.26;
     score+=roleSpaceCandidateBias({role:p.role,attackDirection:dir,anchor:{x:p.homeX??p.x,y:p.homeY??p.y},target:{x,y},field:FIELD,hasPossession:our,defending:enemy})*2.4;
     score+=dynamicSpaceAdvantage(p,opps,{x,y})*(our?.45:enemy?.35:.55);
