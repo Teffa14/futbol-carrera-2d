@@ -13,19 +13,11 @@ export const TACTICAL_PROFILES=Object.freeze({
   'stopper-centre-back':Object.freeze({width:-.34,halfSpace:-.10,depth:-.52,support:.20,combination:-.12,dribble:-.72,directness:.10,roam:-.68}),
 });
 
-const ROLE_DEFAULTS=Object.freeze({
-  LW:'isolation-winger',RW:'isolation-winger',LM:'combinative-winger',RM:'combinative-winger',
-  ST:'direct-striker',CF:'linking-striker',CAM:'playmaking-midfielder',CM:'playmaking-midfielder',CDM:'holding-midfielder',
-  LB:'overlapping-fullback',RB:'overlapping-fullback',LWB:'overlapping-fullback',RWB:'overlapping-fullback',
-  CB:'ball-playing-centre-back',GK:null,
-});
-
 function neutralProfile(){return{width:0,halfSpace:0,depth:0,support:0,combination:0,dribble:0,directness:0,roam:0};}
 
 export function tacticalProfileId(player){
   const explicit=player?.tacticalProfile??player?.data?.tacticalProfile??player?.data?.tacticalProfileId;
-  if(typeof explicit==='string'&&TACTICAL_PROFILES[explicit])return explicit;
-  return ROLE_DEFAULTS[player?.role]||null;
+  return typeof explicit==='string'&&TACTICAL_PROFILES[explicit]?explicit:null;
 }
 
 export function tacticalProfile(player){
