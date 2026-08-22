@@ -14,6 +14,22 @@ export const TACTICAL_PROFILES=Object.freeze({
 });
 
 function neutralProfile(){return{width:0,halfSpace:0,depth:0,support:0,combination:0,dribble:0,directness:0,roam:0};}
+function tendency(value,fallback=50){return clamp((Number(value??fallback)-50)/50,-1,1);}
+
+export function tacticalProfileFromDecisionProfile(profile={},role=''){
+  const width=tendency(profile.width);
+  const run=tendency(profile.runBehind);
+  const support=tendency(profile.showFeet);
+  const combination=clamp(tendency((Number(profile.showFeet??50)+Number(profile.oneTouch??50))/2),-1,1);
+  const dribble=tendency(profile.dribbleIntent);
+  const directness=clamp(tendency((Number(profile.runBehind??50)+Number(profile.passRisk??50)+Number(profile.shootIntent??50))/3),-1,1);
+  const family=String(role||'').toUpperCase();
+  const isWide=['LW','RW','LM','RM','LWB','RWB'].includes(family);
+  const isCentralMid=['CM','CAM','CDM'].includes(family);
+  const halfSpace=clamp((isWide?combination-width*.55:isCentralMid?combination*.72:combination*.35),-1,1);
+  const roam=clamp((combination+support-Math.abs(run))*.42,-1,1);
+  return{width,halfSpace,depth:run,support,combination,dribble,directness,roam};
+}
 
 export function tacticalProfileId(player){
   const explicit=player?.tacticalProfile??player?.data?.tacticalProfile??player?.data?.tacticalProfileId;
@@ -66,4 +82,4 @@ export function tacticalSpaceBias({player,target,anchor,field,hasPossession=fals
   return clamp(bias,-1,1);
 }
 
-export const __tacticalProfileTest={normalizedLane,neutralProfile};
+export const __tacticalProfileTest={normalizedLane,neutralProfile,tendency};
