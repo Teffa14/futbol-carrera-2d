@@ -73,9 +73,9 @@ test('cloud runtime loads before app and recovery UI loads after app',()=>{
   assert.ok(appAt<uiAt,'cloud UI should attach after app');
 });
 
-test('cloud UI exposes copy, sync, and cross-device recovery actions',()=>{
+test('cloud UI exposes copy, save, and cross-device recovery actions',()=>{
   assert.match(cloudUi,/Copiar código/);
-  assert.match(cloudUi,/Sincronizar ahora/);
+  assert.match(cloudUi,/Guardar copia ahora/);
   assert.match(cloudUi,/Recuperar carrera/);
   assert.match(cloudUi,/Guardá este código fuera del juego/);
   assert.match(cloud,/restoreWithRecoveryCode/);
