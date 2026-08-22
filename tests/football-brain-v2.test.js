@@ -10,7 +10,7 @@ import '../role-depth.js';
 import '../match-presentation.js';
 import {FIELD,PLAYER_RADIUS,BALL_RADIUS,isOffsidePosition,onsideLimit} from '../football-rules-v2.js';
 import {motionProfile,goalkeeperTarget} from '../locomotion-v2.js';
-import {positionalIdentity} from '../agent-brain-v2.js';
+import {positionalIdentity,__agentBrainTest} from '../agent-brain-v2.js';
 import {evaluatePassOptions,armIntentPass,__passingTest} from '../passing-intelligence-v2.js';
 
 const roles=['GK','RB','CB','CB','LB','CDM','CM','CAM','RW','ST','LW'];
@@ -70,6 +70,15 @@ test('offside receiver touching the pass produces a defending free kick',()=>{
 
 test('same-role agents have distinct deterministic positional identities and decision cadence',()=>{
   const e=engine('identities'),cbs=e.players.filter(p=>p.team===0&&p.role==='CB');const a=positionalIdentity(cbs[0]),b=positionalIdentity(cbs[1]);assert.deepEqual(a,positionalIdentity(cbs[0]));const differences=Object.keys(a).filter(k=>Math.abs(a[k]-b[k])>.02);assert.ok(differences.length>=3,`identities insufficiently distinct: ${differences}`);
+});
+
+test('spatial scoring values arrival advantage instead of distance alone',()=>{
+  const target={x:500,y:350};
+  const runner={x:430,y:350,vx:3.4,vy:0,facingX:1,facingY:0,team:0,data:{pace:88,stamina:84,physical:72,dribbling:80,ballControl:80,vision:76,composure:74,defense:55,fitness:100}};
+  const defenderReady={x:445,y:350,vx:0,vy:0,facingX:1,facingY:0,team:1,data:{pace:78,stamina:78,physical:74,dribbling:62,ballControl:66,vision:65,composure:68,defense:80,fitness:100}};
+  const defenderWrongFooted={...defenderReady,vx:-3.1,facingX:-1};
+  const tight=__agentBrainTest.dynamicSpaceAdvantage(runner,[defenderReady],target),open=__agentBrainTest.dynamicSpaceAdvantage(runner,[defenderWrongFooted],target);
+  assert.ok(open>tight+.15,`wrong-footed defender should concede more dynamic space: ${open} vs ${tight}`);
 });
 
 test('full 90 minute simulation produces actual football actions instead of a dribble loop',()=>{
