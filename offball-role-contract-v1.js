@@ -38,7 +38,7 @@ export function applyOffBallRoleContract({target,player,ball,tacticalState,tacti
   const anchorX=player.homeX??player.x??target.x;
   const anchorY=player.homeY??player.y??target.y;
 
-  if(/width|outside/.test(action)){
+  if(id==='coach-max-width'||/width|stay-wide|outside/.test(action)){
     const widthStrength=id==='coach-max-width'?Math.min(.92,strength+.18):strength*.64;
     next.y=lerp(next.y,wideLaneY(player,field),widthStrength);
   }
