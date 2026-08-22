@@ -4,6 +4,7 @@ import {motionProfile} from './locomotion-v2.js';
 import {classifyWideBehavior,defensiveResponseTarget,observeOpponentBehavior} from './opponent-adaptation-v1.js';
 import {roleSpaceCandidateBias} from './role-space-decision-v1.js';
 import {estimateArrivalTime} from './dynamic-space-control-v1.js';
+import {perceivedOpponentStates} from './perception-scanning-v1.js';
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
@@ -28,7 +29,7 @@ function dynamicSpaceAdvantage(player,opponents,target){
 function spacingCandidate(engine,p,base,possession){
   const key=playerKey(p),id=positionalIdentity(p),dir=p.team===0?1:-1,our=possession===p.team,enemy=possession!==null&&possession!==p.team;
   const offsets=[{x:0,y:0},{x:22,y:0},{x:-22,y:0},{x:0,y:28},{x:0,y:-28},{x:30,y:24},{x:30,y:-24},{x:-30,y:24},{x:-30,y:-24},{x:46,y:0},{x:0,y:46},{x:0,y:-46}];
-  const mates=engine.players.filter(q=>q.team===p.team&&q.id!==p.id),opps=engine.players.filter(q=>q.team!==p.team),wide=['LW','RW','LB','RB'].includes(p.role),limit=onsideLimit(engine,p.team);
+  const mates=engine.players.filter(q=>q.team===p.team&&q.id!==p.id),opps=perceivedOpponentStates(engine,p),wide=['LW','RW','LB','RB'].includes(p.role),limit=onsideLimit(engine,p.team);
   let best={x:base.x,y:base.y,score:-Infinity};
   for(let i=0;i<offsets.length;i++){
     const o=offsets[i],depthScale=roleFamily(p.role)==='FWD'?1:roleFamily(p.role)==='MID'?.72:.45;
