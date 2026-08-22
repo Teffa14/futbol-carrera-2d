@@ -14,9 +14,9 @@ test('normalizes attacking and defensive coordinates for both directions', () =>
 
 test('expresses player position relative to free ball and role reference', () => {
   const obs = observePlayerSpace({
-    player: { x: 60, y: 24 },
+    player: { x: 60, y: 20 },
     ball: { x: 45, y: 30 },
-    roleReference: { x: 50, y: 30 },
+    roleReference: { x: 50, y: 18 },
     pitch,
     attackDirection: 1,
     phase: 'MIDDLE_THIRD_PROGRESSION',
