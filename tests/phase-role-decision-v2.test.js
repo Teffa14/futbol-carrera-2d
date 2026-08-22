@@ -57,7 +57,9 @@ test('decision runtime derives phase and Role Contract without granting manager 
   assert.equal(context.phase,'progression');
   assert.equal(context.contract.role,'RW');
   assert.equal(context.contract.responsibilities.progression.some(r=>r.id==='coach-max-width'),true);
-  assert.equal(context.contract.authority.permissions.canSetFormation,false);
+  assert.equal(context.contract.authority.permissions.canSetTeamFormation,false);
+  assert.equal(context.contract.authority.permissions.canControlLineup,false);
+  assert.equal(context.contract.authority.permissions.canControlTransfers,false);
 });
 
 test('phase-aware tactical ranking never mutates or owns the free ball',()=>{
