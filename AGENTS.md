@@ -25,6 +25,14 @@ You may:
 
 Temporary technical copies made for authorized work must not become independent mirrors, public archives, unauthorized forks, or reusable copies for third parties.
 
+## Player-facing writing
+
+Before creating, editing, reviewing or generating any text that a player can see, read and follow `COPY_STYLE.md`.
+
+Player-facing UI must speak from inside football. Do not expose implementation details such as engines, AI, autoplay, backend systems, internal weights, shared physics, rule IDs or architecture when the player does not need that information.
+
+Do not use generic motivational or synthetic marketing copy to manufacture emotion. Ground emotion in concrete football situations, choices, relationships and consequences.
+
 ## Ownership and licensing
 
 The repository's original Project Materials are proprietary and are governed by the root `LICENSE` file. All rights are reserved unless the copyright holder grants permission in a separate written agreement.
