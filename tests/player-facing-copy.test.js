@@ -16,11 +16,15 @@ test('turns internal evaluation labels into football-facing copy',()=>{
   assert.equal(replacementFor('Familiaridad 61 · 14 reps'),'Práctica 61 · 14 repeticiones');
   assert.equal(replacementFor('Entrenamiento A · st-profile-finish'),'Entrenamiento · Nota A');
   assert.equal(replacementFor('CM · Estado físico 91 · Confianza DT 67. El partido arranca siempre en x1.'),'CM · Estado físico 91 · Confianza DT 67.');
+  assert.equal(replacementFor('Ganaste 3 punto(s) de atributo durante la prueba. Máximo total de esta etapa: 4.'),'Mejoraste 3 punto(s) de atributo durante la prueba.');
+  assert.equal(replacementFor('Visor 81/100 · confianza 74% · técnico 83 · táctico 79.'),'Visor 81/100 · Técnica 83 · Táctica 79.');
 });
 
 test('replaces generic or system-framed legacy labels',()=>{
   assert.equal(replacementFor('Tu jugador.'),'ELEGÍ TU PUESTO.');
   assert.equal(replacementFor('Tu carrera.'),'DESPUÉS GANÁTELO.');
+  assert.equal(replacementFor('Build'),'Estilo');
+  assert.equal(replacementFor('PvP Async'),'Desafíos');
   assert.equal(replacementFor('Tendencias de tu IA'),'Con pelota');
   assert.equal(replacementFor('IA que estás formando'),'Cómo estás jugando');
   assert.equal(replacementFor('PREVIEW DEL JUVENIL'),'TU JUVENIL');
