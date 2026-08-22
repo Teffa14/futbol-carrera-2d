@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {perceivedOpponentStates,updatePerception} from '../perception-scanning-v1.js';
-import {__agentBrainTest} from '../agent-brain-v2.js';
 
 function player(id,team,x,y,{role='CM',vision=65,composure=65,facingX=1,facingY=0}={}){
   return{
@@ -37,25 +36,25 @@ test('perceived opponent states preserve the last scanned motion state instead o
   assert.equal(opponent.x,170);
 });
 
-test('spatial decisions remain based on remembered opponent position until a new scan updates that information',()=>{
+test('a new scan refreshes the reusable opponent state model without attaching decision authority to it',()=>{
   const observer=player('observer',0,360,350,{role:'CM',vision:70,facingX:1});
-  const mate=player('mate',0,300,420,{role:'CM'});
   const opponent=player('opponent',1,470,350,{role:'CM'});
-  const e=engine([observer,mate,opponent],0);
-  const base={x:390,y:350};
+  const e=engine([observer,opponent],0);
 
-  const visibleDecision=__agentBrainTest.spacingCandidate(e,observer,base,0);
+  let perceived=perceivedOpponentStates(e,observer);
+  assert.equal(perceived[0].x,470);
+  assert.equal(perceived[0].perceptionVisible,true);
 
   opponent.x=180;
   opponent.y=250;
-  e.tick=2;
-  const rememberedDecision=__agentBrainTest.spacingCandidate(e,observer,base,0);
-  assert.deepEqual(rememberedDecision,visibleDecision);
-
   observer.facingX=-1;
   e.tick=20;
   updatePerception(e,observer,{force:true});
-  const rescanned=perceivedOpponentStates(e,observer);
-  assert.equal(rescanned[0].x,180);
-  assert.equal(rescanned[0].y,250);
+  perceived=perceivedOpponentStates(e,observer);
+
+  assert.equal(perceived[0].x,180);
+  assert.equal(perceived[0].y,250);
+  assert.equal(perceived[0].perceptionVisible,true);
+  assert.equal(perceived[0].perceptionConfidence,1);
+  assert.equal('ownerId' in perceived[0],false);
 });
