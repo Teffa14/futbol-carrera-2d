@@ -27,6 +27,7 @@ const EXACT_COPY=new Map([
   ['Ghost XI','Equipo rival'],
   ['Ahora te miran en contexto real.','Ahora vienen los partidos.'],
   ['11 contra 11 autoplay. Los visores pesan más lo que hacés acá que los ejercicios aislados: decisiones, pérdidas, pases, duelos, goles, robos y puntaje.','Los visores te evalúan dentro de un equipo: decisiones, pérdidas, pases, duelos, goles, recuperaciones y rendimiento general.'],
+  ['Los visores están mirando. Este partido pesa 60% dentro de la evidencia combinada.','Los visores miran cada intervención y también lo que hacés sin pelota.'],
   ['ENTRENAMIENTO SIMULADO','ENTRENAMIENTO'],
   ['Entrená acciones, no botones','Trabajo de cancha'],
   ['Cada sesión se ve en cancha. La nota depende de tus atributos, estado físico y familiaridad previa. Practicar crea memoria futbolística. Los atributos sólo suben cuando acumulás suficiente trabajo de desarrollo.','Elegí una situación de tu puesto y repetila. La nota refleja cómo la resolvés y el trabajo se acumula durante la temporada.'],
@@ -37,6 +38,8 @@ const EXACT_COPY=new Map([
   ['Esto reemplaza los viejos sliders. Los números salen de tu build, ramas, foco y experiencia.','Tus tendencias actuales según lo que venís practicando y usando en cancha.'],
   ['Matchday bloqueado','Antes del partido'],
   ['Decisión semanal resuelta','Esta semana'],
+  ['CALIDAD','EJECUCIÓN'],
+  ['ÉXITOS','BUENAS'],
 ]);
 
 const COPY_RULES=[
@@ -44,6 +47,8 @@ const COPY_RULES=[
   [/^La cámara sigue a .+?\. El aro verde y la flecha marcan tu jugador\. El rating cambia con cada pase, regate, remate, robo, pérdida, gol o asistencia\.$/i,'Tu rendimiento se actualiza con lo que hacés en cancha: pases, duelos, remates, recuperaciones, pérdidas, goles y asistencias.'],
   [/^Prioridad\s+\d+\s+·\s+disciplina\s+.+$/i,'Objetivo del DT'],
   [/^Familiaridad\s+(\d+)\s+·\s+(\d+)\s+reps$/i,'Práctica $1 · $2 repeticiones'],
+  [/^Entrenamiento\s+([EDCBAS—])\s+·\s+[a-z0-9-]+$/i,'Entrenamiento · Nota $1'],
+  [/^([A-Z]{2,4})\s+·\s+Estado físico\s+(\d+)\s+·\s+Confianza DT\s+(\d+)\. El partido arranca siempre en x1\.$/i,'$1 · Estado físico $2 · Confianza DT $3.'],
 ];
 
 function replacementFor(raw){
