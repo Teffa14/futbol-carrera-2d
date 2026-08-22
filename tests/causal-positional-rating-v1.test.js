@@ -45,7 +45,7 @@ test('a defender can add value by becoming a safe recycling outlet during build-
 });
 
 test('turnovers are context weighted instead of carrying one flat penalty',()=>{
-  const e=makeEngine(),p=e.playerById('user-player');
+  const e=makeEngine(),p=e.playerById('cb-support');
   const dangerous=turnoverSeverity(p,{x:110,y:350},{pressure:.2,escapeOptions:2});
   const attackingWide=turnoverSeverity(p,{x:880,y:95},{pressure:1,escapeOptions:0});
   assert.ok(dangerous>attackingWide+.04,`${dangerous} should materially exceed ${attackingWide}`);
