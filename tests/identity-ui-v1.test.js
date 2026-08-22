@@ -9,7 +9,7 @@ test('identity screen has progression branches and no legacy equip system',()=>{
   const c=career(),html=__identityUiV1.render(c,createIdentityState(c));
   assert.match(html,/IDENTIDAD FUTBOLÍSTICA/);
   assert.match(html,/Ramas de juego/);
-  assert.match(html,/IA que estás formando/);
+  assert.match(html,/Cómo estás jugando/);
   assert.match(html,/Definición/);
   assert.match(html,/Ruptura/);
   assert.doesNotMatch(html,/máximo 3/i);
