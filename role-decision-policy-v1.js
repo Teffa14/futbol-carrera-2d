@@ -39,6 +39,7 @@ function phaseContractAdjustment({candidate,context,phase,contract}){
   if(phase==='build-up'){
     if(['CB','CDM','CM'].includes(context.family)&&type==='pass')delta+=kind==='support'?.10:.06;
     if(context.family==='CB'&&type==='dribble'&&context.pressure>.35){allowed=false;reason='role-contract:build-up-security';}
+    if(type==='clearance'&&context.pressure<.62)delta-=.12;
     if(type==='shot'&&!['GK'].includes(context.family))delta-=.16;
   }
 
@@ -53,6 +54,7 @@ function phaseContractAdjustment({candidate,context,phase,contract}){
     if(['CAM','W','ST'].includes(context.family)&&type==='shot')delta+=phase==='box-attack'?.14:.08;
     if(context.family==='W'&&type==='dribble')delta+=.06;
     if(['CB','CDM'].includes(context.family)&&type==='dribble')delta-=.10;
+    if(type==='clearance')delta-=.18;
   }
 
   if(phase==='attacking-transition'){
@@ -63,6 +65,7 @@ function phaseContractAdjustment({candidate,context,phase,contract}){
   if(phase==='defensive-transition'||phase==='out-of-possession'){
     if(type==='dribble')delta-=.12;
     if(type==='pass'&&kind==='support')delta+=.08;
+    if(type==='clearance'&&context.defensiveThird&&context.pressure>.58)delta+=.11;
   }
 
   if(ids.has('coach-patient-build')&&type==='pass'){
@@ -99,13 +102,21 @@ export function applyRoleDecisionPolicy({player,candidate,field,pressure=0,phase
 
   if(c.family==='GK'){
     if(type==='shot'||type==='dribble'){allowed=false;reason='keeper-safety';}
-    else if(type==='pass'){delta+=candidate.kind==='support'?.13:.04;reason='keeper-distribution';}
+    else if(type==='clearance'){
+      if(c.defensiveThird&&c.pressure>.42)delta+=.22;
+      else delta-=.12;
+      reason='keeper-relieves-danger';
+    }else if(type==='pass'){delta+=candidate.kind==='support'?.13:.04;reason='keeper-distribution';}
   }
 
   if(c.family==='CB'){
     if(type==='dribble'&&c.defensiveThird&&c.pressure>.42){allowed=false;reason='centre-back-protects-central-loss';}
     else if(type==='shot'&&!c.finalThird){allowed=false;reason='centre-back-holds-structure';}
-    else if(type==='pass'){
+    else if(type==='clearance'){
+      if(c.defensiveThird&&c.pressure>.52)delta+=.24;
+      else delta-=.10;
+      reason='centre-back-clears-danger';
+    }else if(type==='pass'){
       if(c.forward>28)delta+=.12;
       if(candidate.kind==='support'&&c.pressure>.55)delta+=.08;
       reason='centre-back-progress-or-secure';
@@ -113,7 +124,11 @@ export function applyRoleDecisionPolicy({player,candidate,field,pressure=0,phase
   }
 
   if(c.family==='FB'){
-    if(type==='dribble'){
+    if(type==='clearance'){
+      if(c.defensiveThird&&c.pressure>.62)delta+=.15;
+      else delta-=.10;
+      reason='fullback-clears-under-pressure';
+    }else if(type==='dribble'){
       if(c.wide&&c.forward>12&&c.pressure<.68)delta+=.13;
       if(!c.wide&&c.defensiveThird&&c.pressure>.48)delta-=.18;
       reason='fullback-uses-wide-lane';
@@ -121,7 +136,11 @@ export function applyRoleDecisionPolicy({player,candidate,field,pressure=0,phase
   }
 
   if(c.family==='CDM'){
-    if(type==='dribble'&&c.pressure>.48){delta-=.24;reason='pivot-avoids-central-turnover';}
+    if(type==='clearance'){
+      if(c.defensiveThird&&c.pressure>.72)delta+=.08;
+      else delta-=.16;
+      reason='pivot-clears-only-emergency';
+    }else if(type==='dribble'&&c.pressure>.48){delta-=.24;reason='pivot-avoids-central-turnover';}
     else if(type==='pass'){
       if(candidate.kind==='progressive'||candidate.kind==='through')delta+=.15;
       else if(c.pressure>.58)delta+=.09;
@@ -130,24 +149,28 @@ export function applyRoleDecisionPolicy({player,candidate,field,pressure=0,phase
   }
 
   if(c.family==='CM'){
-    if(type==='pass'&&(candidate.kind==='progressive'||candidate.kind==='through')){delta+=.14;reason='midfielder-breaks-line';}
+    if(type==='clearance'){delta-=.22;reason='midfielder-seeks-playable-exit';}
+    else if(type==='pass'&&(candidate.kind==='progressive'||candidate.kind==='through')){delta+=.14;reason='midfielder-breaks-line';}
     else if(type==='dribble'&&c.middleThird&&c.pressure<.45){delta+=.06;reason='midfielder-carries-into-space';}
   }
 
   if(c.family==='CAM'){
-    if(type==='pass'&&candidate.kind==='through'){delta+=.17;reason='creator-attacks-last-line';}
+    if(type==='clearance'){delta-=.28;reason='creator-seeks-playable-exit';}
+    else if(type==='pass'&&candidate.kind==='through'){delta+=.17;reason='creator-attacks-last-line';}
     else if(type==='dribble'&&c.finalThird&&c.pressure<.7){delta+=.12;reason='creator-commits-defender';}
     else if(type==='shot'&&c.finalThird){delta+=.08;reason='creator-finishing-window';}
   }
 
   if(c.family==='W'){
-    if(type==='dribble'&&c.wide&&c.finalThird&&c.pressure<.78){delta+=.18;reason='winger-isolation';}
+    if(type==='clearance'){delta-=.26;reason='winger-seeks-playable-exit';}
+    else if(type==='dribble'&&c.wide&&c.finalThird&&c.pressure<.78){delta+=.18;reason='winger-isolation';}
     else if(type==='pass'&&candidate.kind==='through'&&c.finalThird){delta+=.08;reason='winger-releases-runner';}
     else if(type==='shot'&&c.finalThird&&!c.wide){delta+=.11;reason='winger-inside-finishing';}
   }
 
   if(c.family==='ST'){
-    if(type==='shot'&&c.finalThird){delta+=.19;reason='striker-finishes';}
+    if(type==='clearance'){delta-=.30;reason='striker-seeks-playable-exit';}
+    else if(type==='shot'&&c.finalThird){delta+=.19;reason='striker-finishes';}
     else if(type==='pass'&&candidate.kind==='support'&&c.pressure>.52){delta+=.11;reason='striker-layoff-under-contact';}
     else if(type==='dribble'&&c.finalThird&&c.pressure<.55){delta+=.06;reason='striker-attacks-last-defender';}
   }
