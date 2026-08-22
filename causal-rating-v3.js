@@ -3,6 +3,7 @@ import {FIELD} from './football-rules-v2.js';
 import {bestAttackingSpace} from './collective-space-play-v1.js';
 import {chemistryAdjustedPassOptions} from './chemistry-decision-v1.js';
 import {__evaluationV2} from './match-evaluation-v2.js';
+import './causal-positional-rating-v1.js';
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const dist=(a,b)=>Math.hypot((a?.x??0)-(b?.x??0),(a?.y??0)-(b?.y??0));
