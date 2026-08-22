@@ -23,5 +23,5 @@ test('editor markup exposes five tools and eleven players',()=>{
   for(let i=1;i<=11;i++)assert.match(html,new RegExp(`data-tlab-player="P${i}"`));
   assert.match(html,/id="tlab-board"/);
   assert.match(html,/Guardar jugada/);
-  assert.doesNotMatch(html,/motor|backend|IA|autoplay/i);
+  assert.doesNotMatch(html,/\b(?:motor|backend|IA|autoplay)\b/i);
 });
