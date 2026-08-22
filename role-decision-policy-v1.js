@@ -1,3 +1,5 @@
+import {responsibilitiesForPhase} from './role-contract-v1.js';
+
 const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
 
 function roleFamily(role){
@@ -26,6 +28,55 @@ function laneProfile(player,candidate,field){
   return{wide,forward,lateral};
 }
 
+function phaseContractAdjustment({candidate,context,phase,contract}){
+  if(!phase||!contract)return{delta:0,allowed:true,reason:null,responsibility:null};
+  const rules=responsibilitiesForPhase(contract,phase);
+  const primary=rules[0]||null;
+  let delta=0,allowed=true,reason=primary?`role-contract:${primary.id}`:'role-contract:none';
+  const ids=new Set(rules.map(rule=>rule.id));
+  const type=candidate.type,kind=candidate.kind;
+
+  if(phase==='build-up'){
+    if(['CB','CDM','CM'].includes(context.family)&&type==='pass')delta+=kind==='support'?.10:.06;
+    if(context.family==='CB'&&type==='dribble'&&context.pressure>.35){allowed=false;reason='role-contract:build-up-security';}
+    if(type==='shot'&&!['GK'].includes(context.family))delta-=.16;
+  }
+
+  if(phase==='progression'){
+    if(['CDM','CM','CAM'].includes(context.family)&&type==='pass'&&(kind==='progressive'||kind==='through'))delta+=.10;
+    if(context.family==='W'&&type==='dribble'&&context.wide)delta+=.09;
+    if(context.family==='FB'&&ids.has('coach-overlap-access')&&context.wide&&context.forward>8)delta+=type==='dribble'?.08:type==='pass'?.04:0;
+    if(context.family==='ST'&&ids.has('coach-direct-depth')&&type==='pass'&&kind==='support')delta+=.05;
+  }
+
+  if(phase==='final-third'||phase==='box-attack'){
+    if(['CAM','W','ST'].includes(context.family)&&type==='shot')delta+=phase==='box-attack'?.14:.08;
+    if(context.family==='W'&&type==='dribble')delta+=.06;
+    if(['CB','CDM'].includes(context.family)&&type==='dribble')delta-=.10;
+  }
+
+  if(phase==='attacking-transition'){
+    if(type==='pass'&&(kind==='progressive'||kind==='through'))delta+=.09;
+    if(['W','ST','CAM'].includes(context.family)&&type==='dribble'&&context.forward>10)delta+=.06;
+  }
+
+  if(phase==='defensive-transition'||phase==='out-of-possession'){
+    if(type==='dribble')delta-=.12;
+    if(type==='pass'&&kind==='support')delta+=.08;
+  }
+
+  if(ids.has('coach-patient-build')&&type==='pass'){
+    if(kind==='support')delta+=.08;
+    if(kind==='through'&&context.pressure>.45)delta-=.08;
+  }
+  if(ids.has('coach-max-width')&&context.family==='W'){
+    if(type==='dribble'&&context.wide)delta+=.08;
+    if(type==='shot'&&context.wide)delta-=.05;
+  }
+
+  return{delta,allowed,reason,responsibility:primary};
+}
+
 export function roleDecisionContext({player,candidate,field,pressure=0}={}){
   const phaseProgress=clamp(progress(player,field),0,1);
   const lane=laneProfile(player,candidate,field);
@@ -40,8 +91,8 @@ export function roleDecisionContext({player,candidate,field,pressure=0}={}){
   };
 }
 
-export function applyRoleDecisionPolicy({player,candidate,field,pressure=0}={}){
-  if(!player||!candidate||!field)return{...candidate,allowed:true,roleDelta:0,roleReason:'neutral'};
+export function applyRoleDecisionPolicy({player,candidate,field,pressure=0,phase=null,contract=null}={}){
+  if(!player||!candidate||!field)return{...candidate,allowed:true,roleDelta:0,phaseDelta:0,roleReason:'neutral'};
   const c=roleDecisionContext({player,candidate,field,pressure});
   let allowed=true,delta=0,reason='neutral';
   const type=candidate.type;
@@ -101,15 +152,18 @@ export function applyRoleDecisionPolicy({player,candidate,field,pressure=0}={}){
     else if(type==='dribble'&&c.finalThird&&c.pressure<.55){delta+=.06;reason='striker-attacks-last-defender';}
   }
 
-  const value=Number(candidate.value||0)+delta;
-  return{...candidate,allowed,value,roleDelta:delta,roleReason:reason,roleContext:c};
+  const phasePolicy=phaseContractAdjustment({candidate,context:c,phase,contract});
+  allowed=allowed&&phasePolicy.allowed;
+  const phaseDelta=phasePolicy.delta;
+  const value=Number(candidate.value||0)+delta+phaseDelta;
+  return{...candidate,allowed,value,roleDelta:delta,phaseDelta,roleReason:reason,phaseReason:phasePolicy.reason,activeResponsibility:phasePolicy.responsibility,roleContext:{...c,phase}};
 }
 
-export function rankRoleAwareCandidates({player,candidates=[],field,pressure=0}={}){
+export function rankRoleAwareCandidates({player,candidates=[],field,pressure=0,phase=null,contract=null}={}){
   return candidates
-    .map(candidate=>applyRoleDecisionPolicy({player,candidate,field,pressure}))
+    .map(candidate=>applyRoleDecisionPolicy({player,candidate,field,pressure,phase,contract}))
     .filter(candidate=>candidate.allowed)
     .sort((a,b)=>b.value-a.value);
 }
 
-export const __roleDecisionPolicyTest={roleFamily,progress,laneProfile};
+export const __roleDecisionPolicyTest={roleFamily,progress,laneProfile,phaseContractAdjustment};
