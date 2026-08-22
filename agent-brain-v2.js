@@ -3,6 +3,7 @@ import {FIELD,onsideLimit} from './football-rules-v2.js';
 import {motionProfile} from './locomotion-v2.js';
 import {classifyWideBehavior,defensiveResponseTarget,observeOpponentBehavior} from './opponent-adaptation-v1.js';
 import {roleSpaceCandidateBias} from './role-space-decision-v1.js';
+import {estimateArrivalTime} from './dynamic-space-control-v1.js';
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
@@ -14,6 +15,15 @@ function tacticalIntelligence(p){return clamp(Number(p?.data?.tacticalIQ??p?.dat
 function wideContext(p){const half=(FIELD.bottom-FIELD.top)*.5;return Math.abs((Number(p?.y)||FIELD.centerY)-FIELD.centerY)>half*.54?'wide-isolation':'general';}
 
 export function positionalIdentity(p){const key=playerKey(p);return{width:noise(key,'width')*2-1,depth:noise(key,'depth')*2-1,roam:noise(key,'roam')*2-1,support:noise(key,'support'),aggression:noise(key,'aggression'),risk:noise(key,'risk'),reaction:motionProfile(p).reaction};}
+
+function dynamicSpaceAdvantage(player,opponents,target){
+  const ownTime=estimateArrivalTime(player,target);
+  if(!Number.isFinite(ownTime))return 0;
+  let opponentTime=Infinity;
+  for(const opponent of opponents||[]){const time=estimateArrivalTime(opponent,target);if(time<opponentTime)opponentTime=time;}
+  if(!Number.isFinite(opponentTime))return .8;
+  return clamp(opponentTime-ownTime,-1.5,1.5);
+}
 
 function spacingCandidate(engine,p,base,possession){
   const key=playerKey(p),id=positionalIdentity(p),dir=p.team===0?1:-1,our=possession===p.team,enemy=possession!==null&&possession!==p.team;
@@ -31,6 +41,7 @@ function spacingCandidate(engine,p,base,possession){
     const nearestMate=Math.min(...mates.map(m=>Math.hypot(m.x-x,m.y-y)),180),nearestOpp=Math.min(...opps.map(m=>Math.hypot(m.x-x,m.y-y)),180),baseCost=Math.hypot(x-base.x,y-base.y);
     let score=nearestMate*.035+nearestOpp*.008-baseCost*.021+(noise(key,`candidate-${i}`)-.5)*.26;
     score+=roleSpaceCandidateBias({role:p.role,attackDirection:dir,anchor:{x:p.homeX??p.x,y:p.homeY??p.y},target:{x,y},field:FIELD,hasPossession:our,defending:enemy})*2.4;
+    score+=dynamicSpaceAdvantage(p,opps,{x,y})*(our?1.25:enemy?.9:1.05);
     if(our)score+=dir*(x-base.x)*.011;if(enemy&&roleFamily(p.role)==='DEF')score-=dir*(x-base.x)*.008;
     if(score>best.score)best={x,y,score};
   }
@@ -70,4 +81,4 @@ MatchEngine.prototype.aiTarget=function independentFootballAgent(p,pressers,acto
   return base;
 };
 
-export const __agentBrainTest={spacingCandidate,adaptivePrimaryPressure,wideContext};
+export const __agentBrainTest={spacingCandidate,adaptivePrimaryPressure,wideContext,dynamicSpaceAdvantage};
