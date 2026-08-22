@@ -1,5 +1,6 @@
 import {MatchEngine} from './engine.js';
 import {readActiveIdentity,deriveAIProfile,identityMechanicalMods} from './player-identity-progression-v1.js';
+import {tacticalProfileFromDecisionProfile} from './tactical-profile-v1.js';
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function activeFor(p){const id=readActiveIdentity();if(!id||!p?.data?.isUser)return null;if(id.playerName!==p.data.name||id.position!==p.data.position)return null;return id;}
@@ -15,6 +16,7 @@ MatchEngine.prototype.makeTeam=function identityAwareTeam(lineup,team){
     if(!p.data?.isUser)continue;
     const identity=activeFor(p);if(!identity)continue;
     p.identityProgression=identity;
+    p.tacticalProfile=tacticalProfileFromDecisionProfile(deriveAIProfile(identity),p.role||p.data.position);
     p.legacyCareerSkills=[...(p.data.skills||[])];
     // Legacy equipable perks no longer govern the user player. Identity traits are permanent and evidence-driven.
     p.data.skills=[];
