@@ -4,6 +4,7 @@ import {motionProfile} from './locomotion-v2.js';
 import {classifyWideBehavior,defensiveResponseTarget,observeOpponentBehavior} from './opponent-adaptation-v1.js';
 import {roleSpaceCandidateBias} from './role-space-decision-v1.js';
 import {estimateArrivalTime} from './dynamic-space-control-v1.js';
+import {tacticalSpaceBias} from './tactical-profile-v1.js';
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
@@ -40,7 +41,9 @@ function spacingCandidate(engine,p,base,possession){
     x=clamp(x,FIELD.left+p.r,FIELD.right-p.r);y=clamp(y,FIELD.top+p.r,FIELD.bottom-p.r);
     const nearestMate=Math.min(...mates.map(m=>Math.hypot(m.x-x,m.y-y)),180),nearestOpp=Math.min(...opps.map(m=>Math.hypot(m.x-x,m.y-y)),180),baseCost=Math.hypot(x-base.x,y-base.y);
     let score=nearestMate*.035+nearestOpp*.008-baseCost*.021+(noise(key,`candidate-${i}`)-.5)*.26;
-    score+=roleSpaceCandidateBias({role:p.role,attackDirection:dir,anchor:{x:p.homeX??p.x,y:p.homeY??p.y},target:{x,y},field:FIELD,hasPossession:our,defending:enemy})*2.4;
+    const anchor={x:p.homeX??p.x,y:p.homeY??p.y};
+    score+=roleSpaceCandidateBias({role:p.role,attackDirection:dir,anchor,target:{x,y},field:FIELD,hasPossession:our,defending:enemy})*2.4;
+    score+=tacticalSpaceBias({player:p,anchor,target:{x,y},field:FIELD,hasPossession:our,defending:enemy})*1.55;
     score+=dynamicSpaceAdvantage(p,opps,{x,y})*(our?.45:enemy?.35:.55);
     if(our)score+=dir*(x-base.x)*.011;if(enemy&&roleFamily(p.role)==='DEF')score-=dir*(x-base.x)*.008;
     if(score>best.score)best={x,y,score};
