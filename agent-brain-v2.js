@@ -20,9 +20,10 @@ export function positionalIdentity(p){const key=playerKey(p);return{width:noise(
 function dynamicSpaceAdvantage(player,opponents,target){
   const ownTime=estimateArrivalTime(player,target);
   if(!Number.isFinite(ownTime))return 0;
+  if(!(opponents||[]).length)return 0;
   let opponentTime=Infinity;
   for(const opponent of opponents||[]){const time=estimateArrivalTime(opponent,target);if(time<opponentTime)opponentTime=time;}
-  if(!Number.isFinite(opponentTime))return .8;
+  if(!Number.isFinite(opponentTime))return 0;
   return clamp(opponentTime-ownTime,-1.5,1.5);
 }
 
@@ -39,7 +40,7 @@ function spacingCandidate(engine,p,base,possession){
     if(our&&p.role==='ST')x+=dir*(8+id.aggression*15);
     if(enemy&&['CB','LB','RB','CDM'].includes(p.role))x-=dir*(5+id.aggression*8);
     x=clamp(x,FIELD.left+p.r,FIELD.right-p.r);y=clamp(y,FIELD.top+p.r,FIELD.bottom-p.r);
-    const nearestMate=Math.min(...mates.map(m=>Math.hypot(m.x-x,m.y-y)),180),nearestOpp=Math.min(...opps.map(m=>Math.hypot(m.x-x,m.y-y)),180),baseCost=Math.hypot(x-base.x,y-base.y);
+    const nearestMate=Math.min(...mates.map(m=>Math.hypot(m.x-x,m.y-y)),180),nearestOpp=opps.length?Math.min(...opps.map(m=>Math.hypot(m.x-x,m.y-y)),180):90,baseCost=Math.hypot(x-base.x,y-base.y);
     let score=nearestMate*.035+nearestOpp*.008-baseCost*.021+(noise(key,`candidate-${i}`)-.5)*.26;
     score+=roleSpaceCandidateBias({role:p.role,attackDirection:dir,anchor:{x:p.homeX??p.x,y:p.homeY??p.y},target:{x,y},field:FIELD,hasPossession:our,defending:enemy})*2.4;
     score+=dynamicSpaceAdvantage(p,opps,{x,y})*(our?.45:enemy?.35:.55);
