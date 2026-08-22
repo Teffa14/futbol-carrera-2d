@@ -1,4 +1,5 @@
 import {MatchEngine} from './engine.js';
+import {applyOffBallRoleContract} from './offball-role-contract-v1.js';
 
 const FIELD={left:55,right:1045,top:45,bottom:655,centerX:550,centerY:350};
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -40,8 +41,6 @@ function actorWallTarget(engine,p){
   const dir=p.team===0?1:-1,pr=p.r||10,br=engine.ball.r||5,contact=Math.max(3,pr+br-.8);
   const py=wall.side==='top'?FIELD.top+pr:FIELD.bottom-pr;
   const vertical=Math.abs(engine.ball.y-py),horizontal=Math.sqrt(Math.max(16,contact*contact-vertical*vertical));
-  // Each team approaches from behind the ball relative to its attacking direction.
-  // This means opposing actors naturally use different sides instead of mirroring.
   const px=engine.ball.x-dir*horizontal;
   p.wallApproachTicks=Math.max(Number(p.wallApproachTicks)||0,4);
   return physicalClamp(p,{x:px,y:py});
@@ -72,8 +71,6 @@ function roleTarget(engine,p,possession){
     if(pr.wide){const lane=Math.sign(anchorY-FIELD.centerY)||1;y+=lane*10;}
   }
 
-  // Small deterministic individuality keeps same-role players from selecting
-  // identical coordinates while role and phase remain the dominant factors.
   x+=dir*bias*7;y+=bias*9;
   return physicalClamp(p,{x,y});
 }
@@ -102,9 +99,19 @@ MatchEngine.prototype.aiTarget=function positionalFootballTarget(p,pressers,acto
   }
   if(primaryPresser)return base;
 
-  // Off-ball movement is role/phase specific. Players no longer mirror the
-  // nearest opponent or all collapse onto the same ball coordinate.
-  const target=roleTarget(this,p,possession);
+  let target=roleTarget(this,p,possession);
+  const tacticalState=this.currentTacticalState?.(p.team)||this.tacticalState?.teams?.[p.team]||null;
+  target=applyOffBallRoleContract({
+    target,
+    player:p,
+    ball:this.ball,
+    tacticalState,
+    tactics:this.tactics?.[p.team]||{},
+    field:FIELD,
+    trust:p.data?.coachTrust??p.data?.careerAuthority?.coachTrust??0,
+    influence:p.data?.tacticalInfluence??p.data?.careerAuthority?.tacticalInfluence??0,
+  });
+
   const nearestMate=this.players
     .filter(q=>q.team===p.team&&q.id!==p.id)
     .sort((a,b)=>dist(a,p)-dist(b,p))[0];
