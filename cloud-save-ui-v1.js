@@ -2,7 +2,7 @@ const STYLE_ID='career-cloud-save-style-v1';
 const BUTTON_ID='career-cloud-save-button-v1';
 const MODAL_ID='career-cloud-save-modal-v1';
 
-function esc(value){return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
+function esc(value){return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[ch]));}
 function cloud(){return globalThis.CareerCloudSave||null;}
 function ensureStyle(){
   if(document.getElementById(STYLE_ID))return;
@@ -51,22 +51,22 @@ function openModal(){
   const overlay=document.createElement('div');
   overlay.id=MODAL_ID;
   overlay.className='cloud-save-overlay';
-  overlay.innerHTML=`<section class="cloud-save-panel" role="dialog" aria-modal="true" aria-label="Guardado en la nube">
+  overlay.innerHTML=`<section class="cloud-save-panel" role="dialog" aria-modal="true" aria-label="Guardado online">
     <button class="cloud-save-close" data-cloud-close aria-label="Cerrar">×</button>
-    <div class="cloud-kicker">CAREER ELEVEN · CLOUD SAVE</div>
-    <h2>Tu carrera, también en la nube.</h2>
-    <p>El juego sigue guardando primero en este dispositivo. Supabase mantiene una copia recuperable sin pedirte una cuenta.</p>
-    <label>Tu código de recuperación</label>
+    <div class="cloud-kicker">CAREER ELEVEN · GUARDADO ONLINE</div>
+    <h2>Llevate tu carrera a otro dispositivo.</h2>
+    <p>Tu partida se guarda acá. Este código también te permite recuperarla en otro dispositivo.</p>
+    <label>Código de recuperación</label>
     <textarea readonly data-cloud-code>${esc(code)}</textarea>
     <div class="cloud-save-actions">
       <button data-cloud-copy>Copiar código</button>
-      <button class="secondary" data-cloud-sync>Sincronizar ahora</button>
+      <button class="secondary" data-cloud-sync>Guardar copia ahora</button>
     </div>
-    <div class="cloud-save-warning"><b>Guardá este código fuera del juego.</b> Cualquiera que tenga el código puede abrir esa carrera. Career Eleven no guarda la clave en texto plano en la base.</div>
+    <div class="cloud-save-warning"><b>Guardá este código fuera del juego.</b> Es la llave para recuperar la carrera. Si otra persona lo tiene, también puede abrirla.</div>
     <label>Recuperar una carrera en este dispositivo</label>
     <input data-cloud-restore-code placeholder="Pegá un código CE1…" autocomplete="off" spellcheck="false" />
     <div class="cloud-save-actions"><button class="secondary" data-cloud-restore>Recuperar carrera</button></div>
-    <div class="cloud-save-status">${status.error?`Nube no disponible: ${esc(status.error)}`:`Última sincronización: ${esc(formatSync(status.lastSyncAt))}`}</div>
+    <div class="cloud-save-status">${status.error?`Guardado online no disponible: ${esc(status.error)}`:`Última copia: ${esc(formatSync(status.lastSyncAt))}`}</div>
   </section>`;
   document.body.appendChild(overlay);
   const close=()=>overlay.remove();
@@ -80,7 +80,7 @@ function openModal(){
     const button=event.currentTarget;button.disabled=true;
     try{
       const ok=await api.syncNow();
-      setStatus(overlay,ok?`Sincronizada: ${formatSync(Date.now())}`:'Creá una carrera antes de sincronizar.');
+      setStatus(overlay,ok?`Copia guardada: ${formatSync(Date.now())}`:'Creá una carrera antes de guardar una copia.');
     }catch(error){setStatus(overlay,String(error?.message||error),true);}
     finally{button.disabled=false;}
   };
@@ -104,7 +104,7 @@ function ensureButton(){
   button.id=BUTTON_ID;
   button.className='nav-btn';
   button.type='button';
-  button.innerHTML='<span>☁</span>Nube';
+  button.innerHTML='<span>☁</span>Guardado';
   button.onclick=openModal;
   const reset=nav.querySelector('.reset');
   nav.insertBefore(button,reset||null);
