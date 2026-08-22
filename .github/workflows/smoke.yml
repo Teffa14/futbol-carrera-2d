@@ -17,7 +17,13 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npm run check
       - run: npm run build
-      - run: npm test
+      - name: Run tests
+        run: |
+          if ! npm test > /tmp/career-eleven-tests.log 2>&1; then
+            echo "Test suite failed. Showing final 160 lines:"
+            tail -n 160 /tmp/career-eleven-tests.log
+            exit 1
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: production-static
