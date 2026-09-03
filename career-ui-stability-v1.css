@@ -1,0 +1,151 @@
+/* Career UI stability guard.
+   Normal career screens use the document as their vertical scroll container.
+   Full-screen match sessions and the public landing keep their own locks.
+   Training sessions remain scrollable so every control is reachable. */
+html:not(.public-landing-open):not(:has(body.matchday-v3-live)):not(:has(body.training-live)){
+  min-height:100%;
+  overflow-x:hidden;
+  overflow-y:auto!important;
+}
+
+html:not(.public-landing-open) body:not(.matchday-v3-live):not(.training-live){
+  min-height:100%;
+  height:auto!important;
+  overflow-x:hidden;
+  overflow-y:auto!important;
+}
+
+body:not(.matchday-v3-live):not(.training-live) .shell{
+  min-height:100dvh;
+  height:auto!important;
+  overflow:visible!important;
+}
+
+body:not(.matchday-v3-live):not(.training-live) .layout{
+  min-height:calc(100dvh - 48px);
+  height:auto!important;
+  overflow:visible!important;
+  align-items:start;
+}
+
+body:not(.matchday-v3-live):not(.training-live) .main{
+  min-width:0!important;
+  min-height:0;
+  height:auto!important;
+  max-height:none!important;
+  overflow:visible!important;
+}
+
+html:not(.public-landing-open):has(body.training-live),
+html:not(.public-landing-open) body.training-live{
+  min-height:100%;
+  height:auto!important;
+  overflow-x:hidden!important;
+  overflow-y:auto!important;
+}
+
+body.training-live .shell,
+body.training-live .layout,
+body.training-live .main{
+  height:auto!important;
+  max-height:none!important;
+  overflow:visible!important;
+}
+
+body.training-live .training-live-shell{
+  min-height:calc(100dvh - 64px);
+  height:auto!important;
+}
+
+body.training-live .training-live-body{
+  min-height:0;
+  align-items:start;
+}
+
+body.training-live .training-live-pitch{
+  min-height:420px;
+  max-height:calc(100dvh - 82px);
+  position:sticky;
+  top:72px;
+}
+
+body.training-live .training-live-pitch canvas{
+  max-height:calc(100dvh - 82px)!important;
+}
+
+body.training-live .training-live-side{
+  min-height:0;
+  max-height:calc(100dvh - 82px);
+  overflow:auto!important;
+}
+
+/* Estilo is rendered after the base career view. Keep its late renderer from
+   forcing the page wider than the available main column. */
+body:not(.matchday-v3-live):not(.training-live) .identity-v2,
+body:not(.matchday-v3-live):not(.training-live) .identity-grid,
+body:not(.matchday-v3-live):not(.training-live) .identity-board,
+body:not(.matchday-v3-live):not(.training-live) .identity-side,
+body:not(.matchday-v3-live):not(.training-live) .identity-map,
+body:not(.matchday-v3-live):not(.training-live) .identity-branch,
+body:not(.matchday-v3-live):not(.training-live) .identity-node-pair,
+body:not(.matchday-v3-live):not(.training-live) .identity-build-share[data-build-share-v1]{
+  min-width:0;
+  max-width:100%;
+}
+
+body:not(.matchday-v3-live):not(.training-live) .identity-choice,
+body:not(.matchday-v3-live):not(.training-live) .identity-node,
+body:not(.matchday-v3-live):not(.training-live) .identity-hybrid{
+  min-width:0;
+  overflow-wrap:anywhere;
+}
+
+@media(max-width:1280px){
+  body:not(.matchday-v3-live):not(.training-live) .identity-grid{
+    grid-template-columns:minmax(0,1fr)!important;
+  }
+
+  body:not(.matchday-v3-live):not(.training-live) .identity-side{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:12px;
+  }
+
+  body:not(.matchday-v3-live):not(.training-live) .identity-side>h2,
+  body:not(.matchday-v3-live):not(.training-live) .identity-side>p{
+    grid-column:1/-1;
+  }
+}
+
+@media(max-width:1000px){
+  body.training-live .training-live-pitch{
+    position:static;
+    min-height:0;
+    max-height:none;
+  }
+
+  body.training-live .training-live-pitch canvas{
+    max-height:70dvh!important;
+  }
+
+  body.training-live .training-live-side{
+    max-height:none;
+    overflow:visible!important;
+  }
+}
+
+@media(max-width:760px){
+  body:not(.matchday-v3-live):not(.training-live) .identity-side{
+    display:block;
+  }
+
+  body:not(.matchday-v3-live):not(.training-live) .identity-map{
+    grid-template-columns:minmax(0,1fr)!important;
+    grid-template-rows:auto!important;
+  }
+
+  body:not(.matchday-v3-live):not(.training-live) .identity-branch:nth-of-type(n){
+    grid-column:1!important;
+    grid-row:auto!important;
+  }
+}

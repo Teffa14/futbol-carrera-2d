@@ -1,0 +1,140 @@
+:root{
+  --ce-art-landing:url("./assets/screens/landing.webp");
+  --ce-art-setup:url("./assets/screens/setup.webp");
+  --ce-art-career:url("./assets/screens/career.webp");
+  --ce-art-player:url("./assets/screens/player.webp");
+  --ce-art-build:url("./assets/screens/build.webp");
+  --ce-art-training:url("./assets/screens/training.webp");
+  --ce-art-match:url("./assets/screens/match.webp");
+  --ce-art-league:url("./assets/screens/league.webp");
+  --ce-art-pvp:url("./assets/screens/pvp.webp");
+  --ce-art-sources:url("./assets/screens/sources.webp");
+}
+
+.shell[data-screen="home"]{--ce-screen-art:var(--ce-art-career);--ce-screen-focus:center}
+.shell[data-screen="player"]{--ce-screen-art:var(--ce-art-player);--ce-screen-focus:center}
+.shell[data-screen="build"]{--ce-screen-art:var(--ce-art-build);--ce-screen-focus:center}
+.shell[data-screen="training"]{--ce-screen-art:var(--ce-art-training);--ce-screen-focus:center}
+.shell[data-screen="calendar"]{--ce-screen-art:var(--ce-art-league);--ce-screen-focus:center}
+.shell[data-screen="match"]{--ce-screen-art:var(--ce-art-match);--ce-screen-focus:center}
+.shell[data-screen="league"]{--ce-screen-art:var(--ce-art-league);--ce-screen-focus:center}
+.shell[data-screen="async"]{--ce-screen-art:var(--ce-art-pvp);--ce-screen-focus:center}
+.shell[data-screen="sources"]{--ce-screen-art:var(--ce-art-sources);--ce-screen-focus:center}
+
+.shell[data-screen] .main>.hero{
+  position:relative;
+  isolation:isolate;
+  min-height:178px;
+  overflow:hidden;
+  align-items:flex-end;
+  padding:25px 27px;
+  border:1px solid #365448;
+  border-radius:18px;
+  background-color:#0b1711;
+  background-image:linear-gradient(90deg,rgba(5,13,9,.97) 0%,rgba(5,13,9,.89) 42%,rgba(5,13,9,.28) 100%),linear-gradient(0deg,rgba(5,13,9,.76),transparent 58%),var(--ce-screen-art);
+  background-size:cover;
+  background-position:var(--ce-screen-focus);
+  box-shadow:0 16px 42px #0005;
+}
+.shell[data-screen] .main>.hero>*,.tlab-shell .tlab-hero>*,.identity-v1 .identity-head>*{position:relative;z-index:1}
+.shell[data-screen] .main>.hero h1{font-size:clamp(34px,4vw,53px);max-width:820px;text-shadow:0 2px 18px #000}
+.shell[data-screen] .main>.hero p{color:#c5d2ca;max-width:720px;text-shadow:0 1px 12px #000}
+.shell[data-screen="player"] .main>.hero{background-image:linear-gradient(90deg,rgba(5,13,9,.30),rgba(5,13,9,.88) 57%,rgba(5,13,9,.97)),var(--ce-art-player);padding-left:46%}
+
+.setup[data-screen="setup"]{
+  background-color:#07110c;
+  background-image:linear-gradient(90deg,rgba(5,13,9,.30),rgba(5,13,9,.88) 58%,rgba(5,13,9,.55)),linear-gradient(0deg,rgba(5,13,9,.76),transparent 60%),var(--ce-art-setup);
+  background-size:cover;
+  background-position:center;
+  background-attachment:fixed;
+}
+.setup[data-screen="setup"] .setup-card{background:#07140eea;backdrop-filter:blur(10px);border-color:#4a685b}
+
+.pc-shell.pc-shell{
+  background-color:#07110c!important;
+  background-image:linear-gradient(90deg,rgba(5,13,9,.95),rgba(5,13,9,.80) 58%,rgba(5,13,9,.48)),var(--ce-art-setup)!important;
+  background-size:cover!important;
+  background-position:center!important;
+  background-attachment:fixed!important;
+}
+.pc-shell .pc-head{min-height:195px;align-items:flex-end;padding:24px;border:1px solid #3a584b;background:#07140edb;backdrop-filter:blur(7px)}
+
+#training-home .training-head{
+  min-height:166px;
+  padding:22px 24px;
+  border:1px solid #526772;
+  border-top:3px solid #d8ff4c;
+  background-color:#0b1711;
+  background-image:linear-gradient(90deg,rgba(5,13,9,.94),rgba(5,13,9,.76) 55%,rgba(5,13,9,.18)),var(--ce-art-training);
+  background-size:cover;
+  background-position:center;
+  box-shadow:0 14px 34px #0005;
+}
+
+.identity-v1 .identity-head{
+  position:relative;
+  isolation:isolate;
+  overflow:hidden;
+  min-height:210px;
+  padding:28px 30px;
+  border:1px solid #405d50;
+  background-color:#0b1711;
+  background-image:linear-gradient(90deg,rgba(5,13,9,.32),rgba(5,13,9,.90) 58%,rgba(5,13,9,.97)),var(--ce-art-player);
+  background-size:cover;
+  background-position:center;
+}
+.identity-v1 .identity-head>div:first-child{margin-left:min(42%,520px)}
+
+.tlab-shell .tlab-hero{
+  min-height:178px;
+  padding:24px 27px;
+  border:1px solid #405d50;
+  border-radius:18px;
+  background-color:#0b1711;
+  background-image:linear-gradient(90deg,rgba(5,13,9,.34),rgba(5,13,9,.90) 58%,rgba(5,13,9,.97)),var(--ce-art-build);
+  background-size:cover;
+  background-position:center;
+}
+.tlab-shell .tlab-hero>div:first-child{margin-left:min(42%,500px)}
+
+body.prematch-v2 .pm-scoreline{
+  min-height:142px;
+  padding:20px 24px;
+  background-color:#0b1711;
+  background-image:linear-gradient(90deg,rgba(5,13,9,.80),rgba(5,13,9,.45) 50%,rgba(5,13,9,.80)),linear-gradient(0deg,rgba(5,13,9,.76),transparent),var(--ce-art-match);
+  background-size:cover;
+  background-position:center;
+}
+
+.public-hero{position:relative;isolation:isolate;overflow:hidden}
+.public-hero:before{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:-2;
+  background-image:var(--ce-art-landing);
+  background-size:cover;
+  background-position:center;
+  opacity:.84;
+  transform:scale(1.01);
+}
+.public-hero:after{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:-1;
+  background:linear-gradient(90deg,rgba(5,9,8,.96) 0%,rgba(5,9,8,.76) 48%,rgba(5,9,8,.24) 100%),linear-gradient(0deg,rgba(5,9,8,.88),transparent 58%);
+}
+.public-hero>*{position:relative;z-index:1}
+
+@media(max-width:720px){
+  .shell[data-screen] .main>.hero{min-height:150px;padding:18px;background-image:linear-gradient(90deg,rgba(5,13,9,.94),rgba(5,13,9,.67)),var(--ce-screen-art)}
+  .shell[data-screen="player"] .main>.hero{padding-left:18px;background-image:linear-gradient(90deg,rgba(5,13,9,.88),rgba(5,13,9,.68)),var(--ce-art-player)}
+  .pc-shell .pc-head{min-height:0;padding:18px}
+  #training-home .training-head{min-height:150px;padding:18px}
+  .identity-v1 .identity-head,.tlab-shell .tlab-hero{min-height:165px;padding:19px;background-image:linear-gradient(90deg,rgba(5,13,9,.88),rgba(5,13,9,.68)),var(--ce-art-player)}
+  .tlab-shell .tlab-hero{background-image:linear-gradient(90deg,rgba(5,13,9,.88),rgba(5,13,9,.68)),var(--ce-art-build)}
+  .identity-v1 .identity-head>div:first-child,.tlab-shell .tlab-hero>div:first-child{margin-left:0}
+  body.prematch-v2 .pm-scoreline{min-height:110px;padding:14px 10px}
+  .public-hero:after{background:linear-gradient(0deg,rgba(5,9,8,.95) 0%,rgba(5,9,8,.70) 70%,rgba(5,9,8,.38) 100%)}
+}

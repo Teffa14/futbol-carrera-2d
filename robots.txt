@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://teffa14.github.io/futbol-carrera-2d/sitemap.xml

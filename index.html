@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#07110c" />
+  <meta name="description" content="Career Eleven es un simulador de carrera de futbolista gratis: creá tu jugador, entrená, competí por minutos y mirá partidos 2D autónomos en el navegador." />
+  <meta property="og:title" content="Career Eleven · Ganate el puesto." />
+  <meta property="og:description" content="Llegás como juvenil a un plantel armado. El DT decide quién juega. Entrená, rendí y defendé tu lugar fecha a fecha." />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <title>Career Eleven · Simulador de Carrera de Futbolista Gratis</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./character-creation.css" />
+  <link rel="stylesheet" href="./public-landing.css" />
+  <link rel="stylesheet" href="./mobile-responsive-v2.css" />
+  <link rel="stylesheet" href="./screen-assets.css" />
+  <link rel="stylesheet" href="./privacy-v1.css" />
+  <link rel="stylesheet" href="./career-ui-stability-v1.css" />
+  <link rel="stylesheet" href="./identity-build-ui-v3.css" />
+<link rel="canonical" href="https://teffa14.github.io/futbol-carrera-2d/"><meta property="og:url" content="https://teffa14.github.io/futbol-carrera-2d/"><meta property="og:image" content="https://teffa14.github.io/futbol-carrera-2d/assets/screens/landing.webp"><meta property="og:image:alt" content="Career Eleven, simulador de carrera de futbolista"><meta name="twitter:title" content="Career Eleven · Simulador de carrera de futbolista"><meta name="twitter:description" content="Career Eleven es un simulador de carrera de futbolista gratis: creá tu jugador, entrená, competí por minutos y mirá partidos 2D autónomos en el navegador."><meta name="twitter:image" content="https://teffa14.github.io/futbol-carrera-2d/assets/screens/landing.webp"><meta name="robots" content="index,follow,max-image-preview:large"><link rel="sitemap" type="application/xml" href="https://teffa14.github.io/futbol-carrera-2d/sitemap.xml"><script type="application/ld+json">{"@context":"https://schema.org","@type":"VideoGame","name":"Career Eleven","url":"https://teffa14.github.io/futbol-carrera-2d/","description":"Career Eleven es un simulador de carrera de futbolista gratis: creá tu jugador, entrená, competí por minutos y mirá partidos 2D autónomos en el navegador.","applicationCategory":"Game","gamePlatform":"Web Browser","genre":["Football","Sports simulation","Career simulation"],"inLanguage":["es-AR","en"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}</script><meta name="career-build" content="split-boot-v1"><meta name="career-build-id" content="c2e91c620991"><link rel="alternate" type="application/atom+xml" title="Career Eleven Updates" href="https://teffa14.github.io/futbol-carrera-2d/feed.xml"></head>
+<body style="background:#07110c;color:#f4f7f1">
+  <div id="app"></div>
+  <script>
+    (()=>{
+      if(new URLSearchParams(location.search).has('recovery'))return;
+      const key='career-eleven-2d:v4';
+      const backupKey=`${key}:boot-backup:v1`;
+      const bootAttemptKey='career-eleven-boot-recovery-v1';
+      let bootError='';
+
+      const rememberError=value=>{
+        if(bootError)return;
+        const candidate=value?.error||value?.reason||value;
+        bootError=String(candidate?.message||candidate||'').slice(0,240);
+      };
+      addEventListener('error',rememberError,true);
+      addEventListener('unhandledrejection',rememberError);
+
+      function appHasMountedScreen(app){
+        return Boolean(app?.querySelector?.('[data-screen]'));
+      }
+
+      function currentFixture(save){
+        if(!Array.isArray(save?.schedule)||!save?.clubId)return null;
+        for(const round of save.schedule){
+          const fixture=(Array.isArray(round?.fixtures)?round.fixtures:[]).find(item=>
+            !item?.played&&(item?.home===save.clubId||item?.away===save.clubId)
+          );
+          if(fixture)return fixture;
+        }
+        return null;
+      }
+
+      function repairStaleCommittedSession(){
+        try{
+          const raw=localStorage.getItem(key);
+          if(!raw)return false;
+          const save=JSON.parse(raw);
+          const session=save?.activeMatchSession;
+          if(!session)return false;
+          const fixture=currentFixture(save);
+          const validForCurrent=fixture&&String(session.fixtureId)===String(fixture.id)&&Number(session.season)===Number(save.season)&&session.status==='committed';
+          if(validForCurrent)return false;
+          try{if(!localStorage.getItem(backupKey))localStorage.setItem(backupKey,raw);}catch{}
+          delete save.activeMatchSession;
+          localStorage.setItem(key,JSON.stringify(save));
+          return true;
+        }catch(error){
+          rememberError(error);
+          return false;
+        }
+      }
+
+      function renderBootFailure(){
+        const app=document.getElementById('app');
+        if(!app||appHasMountedScreen(app))return;
+        const detail=bootError?`Detalle técnico: ${bootError}`:'El arranque no llegó a montar la interfaz.';
+        app.innerHTML=`<main data-screen="boot-recovery" style="min-height:100vh;display:grid;place-items:center;padding:24px;background:#07110c;color:#f4f7f1;font-family:Inter,system-ui,sans-serif"><section style="width:min(680px,100%);padding:28px;border:1px solid #49685a;background:#0d1d15;box-shadow:0 20px 55px #0008"><small style="color:#d8ff4c;font-weight:900;letter-spacing:.14em">RECUPERACIÓN DE ARRANQUE</small><h1 style="margin:10px 0 8px;font-size:30px">Tu carrera sigue guardada</h1><p style="margin:0 0 18px;color:#b7c6bd;line-height:1.55">Career Eleven detectó un fallo al reconstruir la pantalla después del partido. No se borró la carrera. Reintentá el arranque con el estado transitorio reparado.</p><button id="career-boot-retry" style="min-height:44px;border:0;padding:11px 16px;background:#d8ff4c;color:#102006;font-weight:900;cursor:pointer">REINTENTAR CARRERA</button><p style="margin:16px 0 0;color:#82958b;font-size:11px;line-height:1.45">${detail.replace(/[<>&]/g,ch=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[ch]))}</p></section></main>`;
+        document.getElementById('career-boot-retry')?.addEventListener('click',()=>{
+          repairStaleCommittedSession();
+          sessionStorage.removeItem(bootAttemptKey);
+          location.reload();
+        });
+      }
+
+      try {
+        const raw=localStorage.getItem(key);
+        if(raw){
+          const save=JSON.parse(raw);
+          const clubCount=save?.world?Object.keys(save.world).length:0;
+          if(clubCount>0&&clubCount<=6)localStorage.removeItem(key);
+          else repairStaleCommittedSession();
+        }
+      } catch(error){rememberError(error);}
+
+      setTimeout(()=>{
+        const app=document.getElementById('app');
+        if(!app||appHasMountedScreen(app)){
+          sessionStorage.removeItem(bootAttemptKey);
+          return;
+        }
+        const repaired=repairStaleCommittedSession();
+        if(repaired&&!sessionStorage.getItem(bootAttemptKey)){
+          sessionStorage.setItem(bootAttemptKey,'1');
+          location.reload();
+          return;
+        }
+        renderBootFailure();
+      },1800);
+    })();
+  </script>
+  <script>
+(()=>{
+  const params=new URLSearchParams(location.search);
+  const recovery=params.has('recovery');
+  const app=document.getElementById('app');
+  if(recovery){
+    if(!app)return;
+    app.innerHTML='<main data-screen="memory-recovery" style="min-height:100vh;display:grid;place-items:center;padding:24px;background:#07110c;color:#f4f7f1;font-family:Inter,system-ui,sans-serif"><section style="width:min(620px,100%);padding:28px;border:1px solid #49685a;background:#0d1d15;box-shadow:0 20px 55px #0008"><small style="color:#d8ff4c;font-weight:900;letter-spacing:.14em">RECUPERAR CARRERA</small><h1 style="margin:10px 0 8px;font-size:30px">Tu carrera sigue guardada</h1><p style="margin:0 0 18px;color:#b7c6bd;line-height:1.55">Podés limpiar el estado del último partido y volver a entrar sin borrar tu carrera.</p><button id="career-memory-recover" style="min-height:44px;border:0;padding:11px 16px;background:#d8ff4c;color:#102006;font-weight:900;cursor:pointer">RECUPERAR CARRERA</button><p id="career-memory-status" style="margin:16px 0 0;color:#82958b;font-size:12px;line-height:1.45"></p></section></main>';
+    document.getElementById('career-memory-recover')?.addEventListener('click',()=>{
+      const status=document.getElementById('career-memory-status');
+      try{
+        const key='career-eleven-2d:v4';
+        const raw=localStorage.getItem(key);
+        if(raw){const state=JSON.parse(raw);if(state&&typeof state==='object'&&state.activeMatchSession){delete state.activeMatchSession;localStorage.setItem(key,JSON.stringify(state));}}
+        try{sessionStorage.removeItem('career-eleven-match-result-recovered');sessionStorage.removeItem('career-eleven-boot-recovery-v1');}catch{}
+        params.delete('recovery');const query=params.toString();location.replace(location.pathname+(query?'?'+query:'')+location.hash);
+      }catch(error){if(status)status.textContent='No pude reparar el último partido. La carrera sigue guardada en este navegador.';}
+    });
+    return;
+  }
+  const script=document.createElement('script');script.src='./app.bundle.js';script.defer=true;script.dataset.careerBundle='split-boot-v1';document.head.appendChild(script);
+})();
+</script>
+</body>
+</html>
